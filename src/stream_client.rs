@@ -49,32 +49,32 @@ where
         StreamClient::new(InterceptedService::new(inner, interceptor))
     }
 
-    #[must_use]
-    pub fn send_gzip(mut self) -> Self {
-        self.inner = self.inner.send_gzip();
-        self
-    }
-
-    #[must_use]
-    pub fn accept_gzip(mut self) -> Self {
-        self.inner = self.inner.accept_gzip();
-        self
-    }
-
-    // pub async fn blocks(
-    //     &mut self,
-    //     request: impl tonic::IntoRequest<Request>,
-    // ) -> Result<tonic::Response<tonic::codec::Streaming<Response>>, tonic::Status> {
-    //     self.inner.ready().await.map_err(|e| {
-    //         tonic::Status::new(
-    //             tonic::Code::Unknown,
-    //             format!("Service was not ready {}", e.into()),
-    //         )
-    //     })?;
-    //     let codec = tonic::codec::ProstCodec::default();
-    //     let path = http::uri::PathAndQuery::from_static("/sf.substreams.v1.Stream/Blocks");
-    //     self.inner
-    //         .server_streaming(request.into_request(), path, codec)
-    //         .await
+    // #[must_use]
+    // pub fn send_gzip(mut self) -> Self {
+    //     self.inner = self.inner.send_gzip();
+    //     self
     // }
+
+    // #[must_use]
+    // pub fn accept_gzip(mut self) -> Self {
+    //     self.inner = self.inner.accept_gzip();
+    //     self
+    // }
+
+    pub async fn blocks(
+        &mut self,
+        request: impl tonic::IntoRequest<Request>,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<Response>>, tonic::Status> {
+        self.inner.ready().await.map_err(|e| {
+            tonic::Status::new(
+                tonic::Code::Unknown,
+                format!("Service was not ready: {}", e.into()),
+            )
+        })?;
+        let codec = tonic::codec::ProstCodec::<Request, Response>::default();
+        let path = http::uri::PathAndQuery::from_static("/sf.substreams.v1.Stream/Blocks");
+        self.inner
+            .server_streaming(request.into_request(), path, codec)
+            .await
+    }
 }

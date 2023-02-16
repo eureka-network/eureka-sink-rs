@@ -1,5 +1,4 @@
-use std::{env, fs, io, ops::Sub};
-use substreams::{pb::substreams::module_output::Data, prelude::*};
+use std::{env, fs};
 use tokio_stream::StreamExt;
 use tonic::transport::Channel;
 
@@ -9,6 +8,19 @@ mod error;
 mod stream_client;
 #[cfg(test)]
 mod tests;
+
+/// Substreams manifest
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Manifest {
+    #[prost(string, tag = "1")]
+    pub spec_version: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub description: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "3")]
+    pub modules: ::prost::alloc::vec::Vec<substreams::pb::substreams::Module>,
+    #[prost(bytes = "vec", repeated, tag = "4")]
+    pub modules_code: ::prost::alloc::vec::Vec<::prost::alloc::vec::Vec<u8>>,
+}
 
 pub struct SubstreamsSinkPostgres {
     filename: String,
@@ -35,34 +47,35 @@ impl SubstreamsSinkPostgres {
         fs::read(self.filename.clone()).map_err(|e| SubstreamsSinkPostgresError::IoError(e))
     }
 
-    // pub fn get_request(
-    //     &self,
-    //     start_block_num: i64,
-    //     start_cursor: String,
-    //     stop_block_num: u64,
-    //     fork_steps: Vec<i32>,
-    //     irreversibility_condition: String,
-    //     initial_store_snapshot_for_modules: Vec<String>,
-    //     output_modules: Vec<String>,
-    // ) -> Result<tonic::Request<substreams::pb::substreams::Request>, SubstreamsSinkPostgresError>
-    // {
-    //     let contents = self.get_file_contents()?;
-    //     let modules = substreams::proto::decode::<substreams::pb::substreams::Modules>(&contents)
-    //         .map_err(|e| SubstreamsSinkPostgresError::DecodeError(e))?;
-    //     Ok(tonic::Request::new(substreams::pb::substreams::Request {
-    //         start_block_num,
-    //         start_cursor,
-    //         stop_block_num,
-    //         fork_steps,
-    //         irreversibility_condition,
-    //         initial_store_snapshot_for_modules,
-    //         modules: Some(modules),
-    //         output_modules,
-    //     }))
-    // }
+    pub fn get_request(
+        &self,
+        start_block_num: i64,
+        start_cursor: String,
+        stop_block_num: u64,
+        fork_steps: Vec<i32>,
+        irreversibility_condition: String,
+        initial_store_snapshot_for_modules: Vec<String>,
+        output_modules: Vec<String>,
+    ) -> Result<tonic::Request<substreams::pb::substreams::Request>, SubstreamsSinkPostgresError>
+    {
+        let contents = self.get_file_contents()?;
+        let modules = substreams::proto::decode::<substreams::pb::substreams::Modules>(&contents)
+            .map_err(|e| SubstreamsSinkPostgresError::DecodeError(e))?;
+        Ok(tonic::Request::new(substreams::pb::substreams::Request {
+            start_block_num,
+            start_cursor,
+            stop_block_num,
+            fork_steps,
+            irreversibility_condition,
+            initial_store_snapshot_for_modules,
+            modules: Some(modules),
+            output_modules,
+        }))
+    }
 }
 
 #[tokio::main]
+#[allow(dead_code)]
 async fn main() {
     let filename = env::args().nth(1).unwrap();
     let grpc_endpoint = env::args().nth(2).unwrap();
@@ -85,22 +98,22 @@ async fn main() {
     let mut client = StreamClient::connect(grpc_endpoint).await.unwrap();
     let request = tonic::Request::new(request);
 
-    // let mut stream = client.blocks(request).await.unwrap().into_inner();
+    let mut stream = client.blocks(request).await.unwrap().into_inner();
 
-    // while let Some(resp) = stream.next().await {
-    //     match resp.unwrap().message.unwrap() {
-    //         substreams::pb::substreams::response::Message::Progress(_) => {
-    //             // TODO: print message
-    //         }
-    //         substreams::pb::substreams::response::Message::SnapshotData(_) => {
-    //             // TODO: print message
-    //         }
-    //         substreams::pb::substreams::response::Message::SnapshotComplete(_) => {
-    //             // TODO: print message
-    //         }
-    //         substreams::pb::substreams::response::Message::Data(Data) => {
-    //             // TODO: insert data in PostGresSQL table
-    //         }
-    //     }
-    // }
+    while let Some(resp) = stream.next().await {
+        match resp.unwrap().message.unwrap() {
+            substreams::pb::substreams::response::Message::Progress(_) => {
+                // TODO: print message
+            }
+            substreams::pb::substreams::response::Message::SnapshotData(_) => {
+                // TODO: print message
+            }
+            substreams::pb::substreams::response::Message::SnapshotComplete(_) => {
+                // TODO: print message
+            }
+            substreams::pb::substreams::response::Message::Data(_data) => {
+                // TODO: insert data in PostGresSQL table
+            }
+        }
+    }
 }
