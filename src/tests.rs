@@ -1,13 +1,10 @@
 use std::fs;
 
-use substreams::proto::decode;
-
-use crate::Manifest;
+use crate::{decode, pb::substreams::Manifest};
 
 #[test]
 fn decode_manifest_to_modules() {
-    let filename = "./substreams.yaml".to_string();
+    let filename = "./test-v0.1.0.spkg".to_string();
     let contents = fs::read(filename).unwrap();
-    println!("contents = {:?}", contents);
-    let _modules = decode::<Manifest>(&contents).unwrap();
+    let _manifest = decode::<Manifest>(&contents).unwrap();
 }
