@@ -1,6 +1,6 @@
-use pb::substreams::Manifest;
 use prost::DecodeError;
 use std::{env, fs};
+use substreams_database_change::pb::database::DatabaseChanges;
 use tokio_stream::StreamExt;
 use tonic::transport::Channel;
 
@@ -8,7 +8,6 @@ use crate::error::SubstreamsSinkPostgresError;
 
 mod db_changes;
 mod error;
-mod pb;
 mod stream_client;
 #[cfg(test)]
 mod tests;
@@ -28,9 +27,8 @@ impl SubstreamsSinkPostgres {
 
     pub async fn get_grpc_stream_client(
         &self,
-    ) -> Result<pb::substreams::stream_client::StreamClient<Channel>, SubstreamsSinkPostgresError>
-    {
-        pb::substreams::stream_client::StreamClient::connect(self.grpc_endpoint.clone())
+    ) -> Result<crate::stream_client::StreamClient<Channel>, SubstreamsSinkPostgresError> {
+        crate::stream_client::StreamClient::connect(self.grpc_endpoint.clone())
             .await
             .map_err(|e| SubstreamsSinkPostgresError::TonicError(e))
     }
@@ -73,20 +71,20 @@ async fn main() {
     let grpc_endpoint = env::args().nth(2).unwrap();
 
     let contents = fs::read(filename).expect("Couldn't read the file!");
-    let manifest = decode::<pb::substreams::Manifest>(&contents).unwrap();
+    let modules = decode::<substreams::pb::substreams::Modules>(&contents).unwrap();
 
-    let request = pb::substreams::Request {
+    let request = substreams::pb::substreams::Request {
         start_block_num: 6810706,
         start_cursor: "".to_string(),
         stop_block_num: 6810806,
         fork_steps: vec![],
         irreversibility_condition: "".to_string(),
-        manifest: Some(manifest),
+        modules: Some(modules),
         output_modules: vec!["block_to_tokens".to_string()],
         initial_store_snapshot_for_modules: vec![],
     };
 
-    let mut client = pb::substreams::stream_client::StreamClient::connect(grpc_endpoint)
+    let mut client = crate::stream_client::StreamClient::connect(grpc_endpoint)
         .await
         .unwrap();
     let request = tonic::Request::new(request);
@@ -95,16 +93,16 @@ async fn main() {
 
     while let Some(resp) = stream.next().await {
         match resp.unwrap().message.unwrap() {
-            pb::substreams::response::Message::Progress(_) => {
+            substreams::pb::substreams::response::Message::Progress(_) => {
                 // TODO: print message
             }
-            pb::substreams::response::Message::SnapshotData(_) => {
+            substreams::pb::substreams::response::Message::SnapshotData(_) => {
                 // TODO: print message
             }
-            pb::substreams::response::Message::SnapshotComplete(_) => {
+            substreams::pb::substreams::response::Message::SnapshotComplete(_) => {
                 // TODO: print message
             }
-            pb::substreams::response::Message::Data(_data) => {
+            substreams::pb::substreams::response::Message::Data(_data) => {
                 // TODO: insert data in PostGresSQL table
             }
         }
