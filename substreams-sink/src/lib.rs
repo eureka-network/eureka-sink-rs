@@ -5,6 +5,7 @@ use tonic::{codegen::*, Status};
 pub struct SubstreamsSink<T> {
     inner: tonic::client::Grpc<T>,
 }
+
 impl SubstreamsSink<tonic::transport::Channel> {
     /// Attempt to create a new client by connecting to a given endpoint.
     pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
@@ -88,6 +89,7 @@ where
         self.inner = self.inner.accept_compressed(CompressionEncoding::Gzip);
         self
     }
+
     pub async fn blocks(
         &mut self,
         request: impl tonic::IntoRequest<Request>,
