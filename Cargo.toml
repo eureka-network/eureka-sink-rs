@@ -1,16 +1,5 @@
-[package]
-name = "substreams-postgres-sync"
-version = "0.1.0"
-edition = "2021"
-description = "Substreams Postgres synchronization"
+[workspace]
+members = ["eureka-sink-postgres", "substreams-sink-rs"]
 
-[dependencies]
-prost = { version = "0.10.1" }
-prost-types = "0.10.1"
-tonic = "0.7.1"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-tokio-stream = { version = "0.1", features = ["net"] }
-thiserror = "^1.0.20"
-
-[build-dependencies]
-tonic-build = "0.7"
+[profile.release]
+opt-level = 2
