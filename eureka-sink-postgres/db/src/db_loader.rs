@@ -104,10 +104,14 @@ impl Loader {
             self.tables.insert(table.clone(), cols);
 
             let primary_keys = self.get_primary_key_from_table(table.as_str())?;
-            let primary_keys = primary_keys.iter().map(|pk| pk.pk.clone()).collect::<Vec<String>>();
+            let primary_keys = primary_keys
+                .iter()
+                .map(|pk| pk.pk.clone())
+                .collect::<Vec<String>>();
             // TODO: for now we only insert the first primary key column,
-            // following the Golang repo. Should we instead be more general ? 
-            self.table_primary_keys.insert(table, primary_keys[0].clone());
+            // following the Golang repo. Should we instead be more general ?
+            self.table_primary_keys
+                .insert(table, primary_keys[0].clone());
         }
 
         Ok(())

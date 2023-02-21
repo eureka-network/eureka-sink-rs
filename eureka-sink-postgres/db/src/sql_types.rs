@@ -131,11 +131,11 @@ pub type VarChar = Text;
 
 pub type Char = Text;
 
-pub type Tinytext = Text;
+pub type TinyText = Text;
 
-pub type Mediumtext = Text;
+pub type MediumText = Text;
 
-pub type Longtext = Text;
+pub type LongText = Text;
 
 #[derive(Debug, Clone)]
 pub struct Binary {
@@ -150,13 +150,13 @@ impl Sql for Binary {
     }
 }
 
-pub type Tinyblob = Binary;
+pub type TinyBlob = Binary;
 
 pub type Blob = Binary;
 
-pub type Mediumblob = Binary;
+pub type MediumBlob = Binary;
 
-pub type Longblob = Binary;
+pub type LongBlob = Binary;
 
 pub type Varbinary = Binary;
 
@@ -233,14 +233,14 @@ pub enum SqlType {
     Text(Text),
     VarChar(VarChar),
     Char(Char),
-    TinyText(Tinytext),
-    MediumText(Mediumtext),
-    LongText(Longtext),
+    TinyText(TinyText),
+    MediumText(MediumText),
+    LongText(LongText),
     Binary(Binary),
-    Tinyblob(Tinyblob),
+    TinyBlob(TinyBlob),
     Blob(Blob),
-    MediumBlob(Mediumblob),
-    LongBlob(Longblob),
+    MediumBlob(MediumBlob),
+    LongBlob(LongBlob),
     Varbinary(Varbinary),
     Bit(Bit),
     Date(Date),
@@ -272,14 +272,14 @@ impl SqlType {
             Self::MediumText(t) => format!("'{:?}'", t.get_inner()),
             Self::LongText(t) => format!("'{:?}'", t.get_inner()),
             Self::Binary(b) => format!("{:?}", b.get_inner()),
-            Self::Tinyblob(b) => format!("{:?}", b.get_inner()),
+            Self::TinyBlob(b) => format!("{:?}", b.get_inner()),
             Self::Blob(b) => format!("{:?}", b.get_inner()),
             Self::MediumBlob(b) => format!("{:?}", b.get_inner()),
             Self::LongBlob(b) => format!("{:?}", b.get_inner()),
             Self::Varbinary(b) => format!("{:?}", b.get_inner()),
             Self::Bit(b) => format!("{:?}", b.get_inner()),
             Self::Date(d) => format!("'{:?}'", d.get_inner()),
-            Self::Interval(i) => format!("'{:?}'", i.get_inner()),
+            Self::Interval(i) => format!("interval '{:?}'", i.get_inner()),
             Self::Time(t) => format!("'{:?}'", t.get_inner()),
             Self::Timestamp(t) => format!("'{:?}'", t.get_inner()),
         }
@@ -309,7 +309,7 @@ pub enum SqlTypeMap {
     MediumText,
     LongText,
     Binary,
-    Tinyblob,
+    TinyBlob,
     Blob,
     MediumBlob,
     LongBlob,
@@ -347,7 +347,7 @@ impl TryFrom<&str> for SqlTypeMap {
             "mediumtext" => Self::MediumText,
             "longtext" => Self::LongText,
             "binary" => Self::Binary,
-            "tinyblob" => Self::Tinyblob,
+            "tinyblob" => Self::TinyBlob,
             "blob" => Self::Blob,
             "mediumblob" => Self::MediumBlob,
             "longblob" => Self::LongBlob,
@@ -361,5 +361,147 @@ impl TryFrom<&str> for SqlTypeMap {
         };
 
         Ok(sql_type)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sql_type_to_string() {
+        let sql_bool = SqlType::Bool(Bool { inner: true });
+        assert_eq!(sql_bool.to_string(), "true".to_string());
+
+        let sql_small_int = SqlType::SmallInt(SmallInt { inner: 1_u16 });
+        assert_eq!(sql_small_int.to_string(), "1".to_string());
+
+        let sql_int2 = SqlType::Int2(Int2 { inner: 1_u16 });
+        assert_eq!(sql_int2.to_string(), "1".to_string());
+
+        let sql_integer = SqlType::Integer(Integer { inner: 1_u32 });
+        assert_eq!(sql_integer.to_string(), "1".to_string());
+
+        let sql_int4 = SqlType::Int4(Int4 { inner: 1_u32 });
+        assert_eq!(sql_int4.to_string(), "1".to_string());
+
+        let sql_big_int = SqlType::BigInt(BigInt { inner: 1_u64 });
+        assert_eq!(sql_big_int.to_string(), "1".to_string());
+
+        let sql_int8 = SqlType::Int8(Int8 { inner: 1_u64 });
+        assert_eq!(sql_int8.to_string(), "1".to_string());
+
+        let sql_float = SqlType::Float(Float { inner: 1.0 });
+        assert_eq!(sql_float.to_string(), "1.0".to_string());
+
+        let sql_float4 = SqlType::Float4(Float { inner: 1.0 });
+        assert_eq!(sql_float4.to_string(), "1.0".to_string());
+
+        let sql_double = SqlType::Double(Double { inner: 1.0 });
+        assert_eq!(sql_double.to_string(), "1.0".to_string());
+
+        let sql_float8 = SqlType::Float8(Float8 { inner: 1.0 });
+        assert_eq!(sql_float8.to_string(), "1.0".to_string());
+
+        let sql_numeric = SqlType::Numeric(Numeric {
+            inner: BigDecimal::from(1_u32),
+        });
+        assert_eq!(sql_numeric.to_string(), "1.0".to_string());
+
+        let sql_decimal = SqlType::Decimal(Decimal {
+            inner: BigDecimal::from(1_u32),
+        });
+        assert_eq!(sql_decimal.to_string(), "1.0".to_string());
+
+        let sql_text = SqlType::Text(Text {
+            inner: "a".to_string(),
+        });
+        assert_eq!(sql_text.to_string(), "'a'".to_string());
+
+        let sql_varchar = SqlType::VarChar(VarChar {
+            inner: "a".to_string(),
+        });
+        assert_eq!(sql_varchar.to_string(), "'a'".to_string());
+
+        let sql_char = SqlType::Char(Char {
+            inner: "a".to_string(),
+        });
+        assert_eq!(sql_char.to_string(), "'a'".to_string());
+
+        let sql_tiny_text = SqlType::TinyText(TinyText {
+            inner: "a".to_string(),
+        });
+        assert_eq!(sql_tiny_text.to_string(), "'a'".to_string());
+
+        let sql_medium_text = SqlType::MediumText(MediumText {
+            inner: "a".to_string(),
+        });
+        assert_eq!(sql_medium_text.to_string(), "'a'".to_string());
+
+        let sql_long_text = SqlType::LongText(LongText {
+            inner: "a".to_string(),
+        });
+        assert_eq!(sql_long_text.to_string(), "'a'".to_string());
+
+        let sql_binary = SqlType::Binary(Binary {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_binary.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_tiny_blob = SqlType::TinyBlob(TinyBlob {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_tiny_blob.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_blob = SqlType::Blob(Blob {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_blob.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_medium_blob = SqlType::MediumBlob(MediumBlob {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_medium_blob.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_long_blob = SqlType::LongBlob(LongBlob {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_long_blob.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_var_binary = SqlType::Varbinary(Varbinary {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_var_binary.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_bit = SqlType::Bit(Bit {
+            inner: vec![0u8, 1, 2],
+        });
+        assert_eq!(sql_bit.to_string(), "[0, 1, 2]".to_string());
+
+        let sql_date = SqlType::Date(Date {
+            inner: NaiveDate::from_ymd(2023, 2, 22),
+        });
+        assert_eq!(sql_date.to_string(), "'2023-02-22");
+
+        let sql_interval = SqlType::Interval(Interval {
+            inner: pg_interval::Interval::from_postgres("1 years 1 months 1 days 1 hours").unwrap(),
+        });
+        assert_eq!(
+            sql_interval.to_string(),
+            "interval '1 years 1 months 1 days 1 hours'"
+        );
+
+        let sql_time = SqlType::Time(Time {
+            inner: NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
+        });
+        assert_eq!(sql_date.to_string(), "'23:59:59'");
+
+        let sql_timestamp = SqlType::Timestamp(Timestamp {
+            inner: NaiveDate::from_ymd_opt(2016, 7, 8)
+                .unwrap()
+                .and_hms_opt(9, 10, 11)
+                .unwrap(),
+        });
+        assert_eq!(sql_timestamp.to_string(), "'2016-07-08 09:10:11'");
     }
 }

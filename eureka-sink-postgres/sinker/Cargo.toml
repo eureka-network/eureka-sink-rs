@@ -7,12 +7,13 @@ edition = "2021"
 
 
 [dependencies]
-prost = { version = "0.10.1" }
-prost-types = "0.10.1"
-tonic = "0.7.1"
+prost = { version = "^0.11.0" }
+prost-types = "^0.11.0"
+tonic = "0.8.3"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 thiserror = "^1.0.20"
+substreams-database-change = { git = "https://github.com/streamingfast/substreams-database-change" }
 
 [build-dependencies]
-tonic-build = "0.7"
+tonic-build = "0.8"
