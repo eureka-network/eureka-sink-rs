@@ -1,5 +1,5 @@
 [workspace]
-members = ["eureka-sink-postgres", "substreams-sink-rs"]
+members = ["eureka-sink-postgres", "substreams-sink"]
 
 [profile.release]
 opt-level = 2
