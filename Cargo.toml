@@ -1,5 +1,9 @@
 [workspace]
-members = ["eureka-sink-postgres", "substreams-sink"]
+members = [
+    "bin/node/cli",
+    "eureka-sink-postgres",
+    "substreams-sink",
+]
 
 [profile.release]
 opt-level = 2
