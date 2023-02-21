@@ -1,8 +1,11 @@
 use bigdecimal::BigDecimal;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel::query_builder::SqlQuery;
+use std::convert::TryFrom;
 
-pub trait SqlType {
+use crate::error::DBError;
+
+pub trait Sql {
     type T;
     type Inner;
     fn get_inner(&self) -> &Self::Inner;
@@ -13,7 +16,7 @@ pub struct Bool {
     inner: bool,
 }
 
-impl SqlType for Bool {
+impl Sql for Bool {
     type T = diesel::sql_types::Bool;
     type Inner = bool;
     fn get_inner(&self) -> &Self::Inner {
@@ -26,7 +29,7 @@ pub struct SmallInt {
     inner: u16,
 }
 
-impl SqlType for SmallInt {
+impl Sql for SmallInt {
     type T = diesel::sql_types::SmallInt;
     type Inner = u16;
     fn get_inner(&self) -> &Self::Inner {
@@ -41,7 +44,7 @@ pub struct Integer {
     inner: u32,
 }
 
-impl SqlType for Integer {
+impl Sql for Integer {
     type T = diesel::sql_types::Integer;
     type Inner = u32;
     fn get_inner(&self) -> &Self::Inner {
@@ -56,7 +59,7 @@ pub struct BigInt {
     inner: u64,
 }
 
-impl SqlType for BigInt {
+impl Sql for BigInt {
     type T = diesel::sql_types::BigInt;
     type Inner = u64;
     fn get_inner(&self) -> &Self::Inner {
@@ -71,7 +74,7 @@ pub struct Float {
     inner: f32,
 }
 
-impl SqlType for Float {
+impl Sql for Float {
     type T = diesel::sql_types::Float;
     type Inner = f32;
     fn get_inner(&self) -> &Self::Inner {
@@ -86,7 +89,7 @@ pub struct Double {
     inner: f64,
 }
 
-impl SqlType for Double {
+impl Sql for Double {
     type T = diesel::sql_types::Double;
     type Inner = f64;
     fn get_inner(&self) -> &Self::Inner {
@@ -101,7 +104,7 @@ pub struct Numeric {
     inner: BigDecimal,
 }
 
-impl SqlType for Numeric {
+impl Sql for Numeric {
     type T = diesel::sql_types::Numeric;
     type Inner = BigDecimal;
     fn get_inner(&self) -> &Self::Inner {
@@ -116,7 +119,7 @@ pub struct Text {
     inner: String,
 }
 
-impl SqlType for Text {
+impl Sql for Text {
     type T = diesel::sql_types::Text;
     type Inner = String;
     fn get_inner(&self) -> &Self::Inner {
@@ -139,7 +142,7 @@ pub struct Binary {
     inner: Vec<u8>,
 }
 
-impl SqlType for Binary {
+impl Sql for Binary {
     type T = diesel::sql_types::Binary;
     type Inner = Vec<u8>;
     fn get_inner(&self) -> &Self::Inner {
@@ -164,7 +167,7 @@ pub struct Date {
     inner: NaiveDate,
 }
 
-impl SqlType for Date {
+impl Sql for Date {
     type T = diesel::sql_types::Date;
     type Inner = NaiveDate;
     fn get_inner(&self) -> &Self::Inner {
@@ -177,7 +180,7 @@ pub struct Timestamp {
     inner: NaiveDateTime,
 }
 
-impl SqlType for Timestamp {
+impl Sql for Timestamp {
     type T = diesel::sql_types::Timestamp;
     type Inner = NaiveDateTime;
     fn get_inner(&self) -> &Self::Inner {
@@ -190,7 +193,7 @@ pub struct Time {
     inner: NaiveTime,
 }
 
-impl SqlType for Time {
+impl Sql for Time {
     type T = diesel::sql_types::Time;
     type Inner = NaiveTime;
     fn get_inner(&self) -> &Self::Inner {
@@ -203,7 +206,7 @@ pub struct Interval {
     inner: pg_interval::Interval,
 }
 
-impl SqlType for Interval {
+impl Sql for Interval {
     type T = diesel::sql_types::Interval;
     type Inner = pg_interval::Interval;
     fn get_inner(&self) -> &Self::Inner {
@@ -213,7 +216,7 @@ impl SqlType for Interval {
 
 /// A native enumeration for diesel SQL types
 #[derive(Debug, Clone)]
-pub enum SqlTypeEnum {
+pub enum SqlType {
     Bool(Bool),
     SmallInt(SmallInt),
     Int2(Int2),
@@ -246,8 +249,8 @@ pub enum SqlTypeEnum {
     Timestamp(Timestamp),
 }
 
-impl SqlTypeEnum {
-    pub fn get_inner(&self) -> String {
+impl SqlType {
+    pub fn to_string(&self) -> String {
         match self {
             Self::Bool(b) => format!("{:?}", b.get_inner()),
             Self::SmallInt(i) => format!("{:?}", i.get_inner()),
@@ -280,5 +283,83 @@ impl SqlTypeEnum {
             Self::Time(t) => format!("'{:?}'", t.get_inner()),
             Self::Timestamp(t) => format!("'{:?}'", t.get_inner()),
         }
+    }
+}
+
+/// A native enumeration for diesel SQL types
+#[derive(Debug, Clone)]
+pub enum SqlTypeMap {
+    Bool,
+    SmallInt,
+    Int2,
+    Integer,
+    Int4,
+    BigInt,
+    Int8,
+    Float,
+    Float4,
+    Double,
+    Float8,
+    Numeric,
+    Decimal,
+    Text,
+    VarChar,
+    Char,
+    TinyText,
+    MediumText,
+    LongText,
+    Binary,
+    Tinyblob,
+    Blob,
+    MediumBlob,
+    LongBlob,
+    Varbinary,
+    Bit,
+    Date,
+    Interval,
+    Time,
+    Timestamp,
+}
+
+impl TryFrom<&str> for SqlTypeMap {
+    type Error = DBError;
+
+    fn try_from(value: &str) -> Result<Self, DBError> {
+        let value = value.to_lowercase();
+        let sql_type = match value.as_str() {
+            "bool" => Self::Bool,
+            "smallint" => Self::SmallInt,
+            "int2" => Self::Int2,
+            "integer" => Self::Integer,
+            "int4" => Self::Int4,
+            "bigint" => Self::BigInt,
+            "int8" => Self::Int8,
+            "float" => Self::Float,
+            "float4" => Self::Float4,
+            "double" => Self::Double,
+            "float8" => Self::Float8,
+            "numeric" => Self::Numeric,
+            "decimal" => Self::Decimal,
+            "text" => Self::Text,
+            "varchar" => Self::VarChar,
+            "char" => Self::Char,
+            "tinytext" => Self::TinyText,
+            "mediumtext" => Self::MediumText,
+            "longtext" => Self::LongText,
+            "binary" => Self::Binary,
+            "tinyblob" => Self::Tinyblob,
+            "blob" => Self::Blob,
+            "mediumblob" => Self::MediumBlob,
+            "longblob" => Self::LongBlob,
+            "varbinary" => Self::Varbinary,
+            "bit" => Self::Bit,
+            "date" => Self::Date,
+            "interval" => Self::Interval,
+            "time" => Self::Time,
+            "timestamp" => Self::Timestamp,
+            _ => return Err(DBError::InvalidFieldType),
+        };
+
+        Ok(sql_type)
     }
 }

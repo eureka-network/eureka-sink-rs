@@ -1,3 +1,9 @@
-./target
+# todo: deprecate
 test-v0.1.0.spkg
-./db/target
+
+# development environment variables
+.env
+
+#rust
+Cargo.lock
+target

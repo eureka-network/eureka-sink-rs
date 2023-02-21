@@ -1,6 +1,6 @@
 use crate::{
     error::DBError,
-    sql_types::{SqlType, SqlTypeEnum},
+    sql_types::{Sql, SqlType},
 };
 use diesel::{sql_query, sql_types, PgConnection};
 use std::collections::HashMap;
@@ -16,8 +16,8 @@ pub struct Operation {
     table_name: String,
     primary_key_column_name: String,
     op_type: OperationType,
-    primary_key: SqlTypeEnum,
-    data: HashMap<String, SqlTypeEnum>,
+    primary_key: SqlType,
+    data: HashMap<String, SqlType>, // mapping data row from columns -> field
 }
 
 impl Operation {
@@ -26,8 +26,8 @@ impl Operation {
         table_name: String,
         primary_key_column_name: String,
         op_type: OperationType,
-        primary_key: SqlTypeEnum,
-        data: HashMap<String, SqlTypeEnum>,
+        primary_key: SqlType,
+        data: HashMap<String, SqlType>,
     ) -> Self {
         Self {
             schema_name,
@@ -40,7 +40,7 @@ impl Operation {
     }
 
     // TODO: need to parse sql query in accordance with the data type
-    pub fn query(&self, connection: &PgConnection) -> Result<String, DBError> {
+    pub fn build_query(&self) -> String {
         let query = match self.op_type {
             OperationType::Delete => {
                 format!(
@@ -48,23 +48,24 @@ impl Operation {
                     self.schema_name,
                     self.table_name,
                     self.primary_key_column_name,
-                    self.primary_key.get_inner()
+                    self.primary_key.to_string()
                 )
             }
             OperationType::Insert => {
                 let mut keys = "".to_string();
                 let mut values = "".to_string();
 
+                // TODO: write this in a more idiomatic way
                 self.data
                     .iter()
                     .map(|(k, v)| {
                         keys.push_str(format!(",{}", k).as_str());
-                        values.push_str(format!(",{}", v.get_inner()).as_str());
+                        values.push_str(format!(",{}", v.to_string()).as_str());
                     })
                     .collect::<Vec<()>>();
                 // remove extra initial ','
-                keys.remove(0);
-                values.remove(0);
+                keys.remove(0); // ,col1,col2,col3,col4 -> col1,col2,col3,col4
+                values.remove(0); //
 
                 format!(
                     "INSERT INTO {}.{} ({}) VALUES ({})",
@@ -73,22 +74,25 @@ impl Operation {
             }
             OperationType::Update => {
                 let mut updates = "".to_string();
+                // TODO; write this more idiomatically
                 self.data
                     .iter()
-                    .map(|(k, v)| updates.push_str(format!("{}={}", k, v.get_inner()).as_str()))
+                    .map(|(k, v)| updates.push_str(format!(",{}={}", k, v.to_string()).as_str()))
                     .collect::<Vec<()>>();
+                // remove extra initial ','
+                updates.remove(0);
                 format!(
                     "UPDATE {}.{} SET {} WHERE {}={}",
                     self.schema_name,
                     self.table_name,
                     updates,
                     self.primary_key_column_name,
-                    self.primary_key.get_inner()
+                    self.primary_key.to_string()
                 )
             }
         };
 
-        Ok(query)
+        query
     }
 }
 

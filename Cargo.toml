@@ -1,20 +1,5 @@
-[package]
-name = "substreams-postgres-sync"
-version = "0.1.0"
-edition = "2021"
-description = "Substreams Postgres synchronization"
+[workspace]
+members = ["eureka-sink-postgres", "substreams-sink", "db"]
 
-[dependencies]
-diesel = { version = "2.0.3", features = ["postgres"] }
-prost = { version = "^0.11.0" }
-prost-types = "^0.11.0"
-tonic = { version = "0.8.3", features = ["gzip"] }
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-tokio-stream = { version = "0.1", features = ["net"] }
-thiserror = "^1.0.20"
-substreams = "0.5.4"
-substreams-database-change = { git ="https://github.com/streamingfast/substreams-database-change" }
-
-[build-dependencies]
-tonic-build = "0.8"
-
+[profile.release]
+opt-level = 2

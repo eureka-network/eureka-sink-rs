@@ -14,4 +14,6 @@ pub enum DBError {
     InvalidCursorColumnType,
     #[error("Invalid schema path: {0}")]
     InvalidSchemaPath(#[from] std::io::Error),
+    #[error("Invalid field type")]
+    InvalidFieldType,
 }

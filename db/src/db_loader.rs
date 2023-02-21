@@ -1,7 +1,12 @@
-use crate::{error::DBError, sql_types::SqlTypeEnum};
+use crate::{error::DBError, sql_types::SqlTypeMap};
 use crate::{operation::Operation, sql_types::BigInt};
 use diesel::{sql_query, sql_types, Connection, PgConnection, QueryableByName, RunQueryDsl};
-use std::{collections::{HashMap, HashSet}, fs::create_dir_all, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    fs::create_dir_all,
+    path::PathBuf,
+};
 
 pub struct Loader {
     connection: PgConnection,
@@ -9,11 +14,13 @@ pub struct Loader {
     schema: String,
     entries: HashMap<String, HashMap<String, Operation>>,
     entries_count: u64,
-    tables: HashMap<String, HashMap<String, SqlTypeEnum>>,
-    table_primary_keys: HashMap<String, SqlTypeEnum>,
+    tables: HashMap<String, HashMap<String, SqlTypeMap>>,
+    table_primary_keys: HashMap<String, String>,
 }
 
 #[derive(QueryableByName)]
+// TODO: rename fields according to query outputs
+// TODO: add docs
 pub struct RawQueryPrimaryKey {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pk: String,
@@ -22,9 +29,9 @@ pub struct RawQueryPrimaryKey {
 #[derive(QueryableByName)]
 pub struct RawQueryTableNames {
     #[diesel(sql_type = diesel::sql_types::Text)]
-    table: String,
+    table_name: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
-    column: String,
+    column_name: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     column_type: String,
 }
@@ -55,15 +62,15 @@ impl Loader {
         let query_all_tables = format!(
             "
             SELECT
-                TABLE_NAME AS TableName
-                , COLUMN_NAME AS ColumnName
-                , DATA_TYPE AS DataType
+                TABLE_NAME AS table_name
+                , COLUMN_NAME AS column_name
+                , DATA_TYPE AS column_type
             FROM information_schema.columns
             WHERE table_type = 'BASE TABLE' table_schema = '{}'
             ORDER BY
-                TableName
-                , ColumnName
-                , DataType;
+                table_name
+                , column_name
+                , column_type;
         ",
             self.schema
         );
@@ -71,15 +78,36 @@ impl Loader {
             .load::<RawQueryTableNames>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
-        let all_tables = all_tables_and_cols.iter().map(|q| q.table).collect::<HashSet<_>>();
+        let all_tables = all_tables_and_cols
+            .iter()
+            .map(|q| q.table_name.clone())
+            .collect::<HashSet<_>>();
 
         let mut seen_cursor_table = false;
         for table in all_tables {
-            let cols = all_tables_and_cols.iter().filter(|q| q.table == table).map(|q| (q.column, q.column_type)).collect::<HashMap<_>>();
-            
+            let cols = all_tables_and_cols
+                .iter()
+                .filter(|q| q.table_name == table)
+                .map(|q| {
+                    (
+                        q.column_name.clone(),
+                        SqlTypeMap::try_from(q.column_type.as_str()).expect("Invalid field type"),
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+
             if table.as_str() == "cursors" {
-                self.validate_cursor_tables(cols)?;
+                self.validate_cursor_tables(cols.clone())?;
             }
+
+            // update tables mapping
+            self.tables.insert(table.clone(), cols);
+
+            let primary_keys = self.get_primary_key_from_table(table.as_str())?;
+            let primary_keys = primary_keys.iter().map(|pk| pk.pk.clone()).collect::<Vec<String>>();
+            // TODO: for now we only insert the first primary key column,
+            // following the Golang repo. Should we instead be more general ? 
+            self.table_primary_keys.insert(table, primary_keys[0].clone());
         }
 
         Ok(())
@@ -87,7 +115,7 @@ impl Loader {
 
     pub fn validate_cursor_tables(
         &mut self,
-        columns: HashMap<String, SqlTypeEnum>,
+        columns: HashMap<String, SqlTypeMap>,
     ) -> Result<(), DBError> {
         if columns.len() != 4 {
             return Err(DBError::InvalidCursorColumns);
@@ -109,17 +137,17 @@ impl Loader {
             }
 
             match col {
-                SqlTypeEnum::BigInt(_) | SqlTypeEnum::Int8(_) => {
+                SqlTypeMap::BigInt | SqlTypeMap::Int8 => {
                     if col_name != "block_num" {
                         return Err(DBError::InvalidCursorColumnType);
                     }
                 }
-                SqlTypeEnum::Text(_)
-                | SqlTypeEnum::VarChar(_)
-                | SqlTypeEnum::Char(_)
-                | SqlTypeEnum::TinyText(_)
-                | SqlTypeEnum::MediumText(_)
-                | SqlTypeEnum::LongText(_) => {
+                SqlTypeMap::Text
+                | SqlTypeMap::VarChar
+                | SqlTypeMap::Char
+                | SqlTypeMap::TinyText
+                | SqlTypeMap::MediumText
+                | SqlTypeMap::LongText => {
                     if col_name == "block_num" {
                         return Err(DBError::InvalidCursorColumnType);
                     }
