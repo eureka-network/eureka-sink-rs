@@ -1,10 +1,25 @@
 # Substreams Sink
 
-Example
+(warning) this crate is under development and should not yet be dependend on externally as much may change.
 
-```use prost::DecodeError;
+A minimal Rust implementation of https://github.com/streamingfast/substream-sink.
+This is intended to generic for any Rust project building a sink for Substreams, so it is a seperate crate.
+
+## Build
+- git submodule init
+- git submodule update
+- cargo build
+  
+## Tasks
+
+- [ ] define and implement initial unit tests and possible mocks
+
+## Example usage
+
+```
+use prost::DecodeError;
 use std::env;
-use substreams_sink::{pb::substreams::response::Message, SubstreamsSink};
+use substreams_sink::{pb::response::Message, SubstreamsSink};
 use tokio_stream::StreamExt;
 
 #[tokio::main]
@@ -17,7 +32,6 @@ async fn main() {
 
     let client = SubstreamsSink::connect(grpc_endpoint).await.unwrap();
     let mut stream = client
-        .accept_compressed()
         .get_stream(
             &package_file_name,
             &module_name,
