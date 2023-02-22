@@ -1,6 +1,11 @@
 # Substreams Sink PostgreSQL
 A Rust library to synchronize Substreams manifest data ingestion to PostgreSQL.
 
+## Building
+- git submodule init
+- git submodule update
+- cargo build
+  
 ## Testing
 Generate a Substreams .spkg file, using a specific manifest specification and using the command
 

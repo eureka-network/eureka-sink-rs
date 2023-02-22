@@ -5,6 +5,11 @@
 A minimal Rust implementation of https://github.com/streamingfast/substream-sink.
 This is intended to generic for any Rust project building a sink for Substreams, so it is a seperate crate.
 
+## Build
+- git submodule init
+- git submodule update
+- cargo build
+  
 ## Tasks
 
 - [ ] define and implement initial unit tests and possible mocks
