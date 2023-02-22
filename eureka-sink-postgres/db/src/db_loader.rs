@@ -1,6 +1,7 @@
 use crate::{error::DBError, sql_types::SqlTypeMap};
 use crate::{operation::Operation, sql_types::BigInt};
 use diesel::{sql_query, sql_types, Connection, PgConnection, QueryableByName, RunQueryDsl};
+use dsn::DSN;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
@@ -10,6 +11,7 @@ use std::{
 
 pub struct Loader {
     connection: PgConnection,
+    dsn: DSN,
     database: String,
     schema: String,
     entries: HashMap<String, HashMap<String, Operation>>,
@@ -43,6 +45,7 @@ impl Loader {
         // create_dir_all(path.parent().unwrap())
         //     .map_err(|_| DBError::FileSystemPathDoesNotExist)?;
 
+        let dsn = dsn::parse(path.to_str())?;
         let database_url = path.to_str().expect("database_url utf-8 error");
         let connection =
             PgConnection::establish(database_url).map_err(|e| DBError::ConnectionError(e))?;
