@@ -190,8 +190,6 @@ mod tests {
             "INSERT INTO my_scheme.my_table (col1,col3,col2) VALUES (10,[0, 1, 2],'2023-03-01')",
         ];
 
-        println!("{}", query);
-
         assert!(possible_queries.contains(&query.as_str()));
     }
 
@@ -240,8 +238,6 @@ mod tests {
             "UPDATE my_scheme.my_table SET col2='2023-03-01',col3=[0, 1, 2],col1=10 WHERE my_primary_key_column_name='field_to_delete'",
             "UPDATE my_scheme.my_table SET col1=10,col3=[0, 1, 2],col2='2023-03-01' WHERE my_primary_key_column_name='field_to_delete'"
         ];
-
-        println!("{}", query);
 
         assert!(possible_queries.contains(&query.as_str()));
     }
