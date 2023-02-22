@@ -3,3 +3,4 @@ members = ["eureka-sink-postgres", "substreams-sink"]
 
 [profile.release]
 opt-level = 2
+# todo: set proper profile options https://doc.rust-lang.org/cargo/reference/profiles.html

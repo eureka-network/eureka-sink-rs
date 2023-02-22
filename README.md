@@ -1,4 +1,4 @@
-# Substreams Sink PostgreSQL
+# Eureka Sink
 A Rust library to synchronize Substreams manifest data ingestion to PostgreSQL.
 
 ## Connect to a firehose instance (for now hosted by Streaming Fast)
@@ -7,7 +7,30 @@ copy your `STREAMINGFAST_KEY` into a `.env` file. (You can get an API key on htt
 
 then run `source ./firehouse_token.sh` to get `SUBSTREAMS_API_TOKEN` set in your local shell.
 
-## Testing
+## Getting Started
+
+### Setting up PostGreSQL
+Requires `docker` and `docker-compose` installed.
+
+Run PostGreSQL and gpweb as a monitoring tool:
+```
+docker compose up
+```
+Open `http://localhost:8081` to see the PostgreSQL
+
+## Building
+We depend on `.proto` files from StreamingFast, to load these initialise git submodules:
+```
+  git submodule init
+  git submodule update
+```
+then Cargo will generate the necessary protobuf definitions before building automatically
+```
+  cargo build
+```
+
+todo: setup demo folder with first integrated test
+## Testing (incomplete information)
 Generate a Substreams .spkg file, using a specific manifest specification and using the command
 
 `substreams pack substreams_manifest.yaml`.
