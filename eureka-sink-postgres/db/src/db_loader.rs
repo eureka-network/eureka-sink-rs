@@ -235,7 +235,7 @@ impl Loader {
     ) -> Result<Vec<RawQueryPrimaryKey>, DBError> {
         let query = format!(
             "
-            SELECT a.attname
+            SELECT a.attname as pk
             FROM   pg_index i
             JOIN   pg_attribute a ON a.attrelid = i.indrelid
                                 AND a.attnum = ANY(i.indkey)
