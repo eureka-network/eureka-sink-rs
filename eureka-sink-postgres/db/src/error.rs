@@ -16,4 +16,6 @@ pub enum DBError {
     InvalidSchemaPath(#[from] std::io::Error),
     #[error("Invalid field type")]
     InvalidFieldType,
+    #[error("Invalid DNS parsing: {0}")]
+    InvalidDSNParsing(#[from] dsn::ParseError),
 }
