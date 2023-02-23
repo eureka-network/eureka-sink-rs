@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package sepana.ingest.v1;
+
+message IngestOperations {
+  repeated IngestOperation operations = 1;
+}
+
+message IngestOperation {
+  string key = 1;
+  string value = 2;
+  uint64 block = 3;
+  uint64 ordinal = 4;
+  enum Type {
+    UNSET = 0;    // Protobuf default should not be used, this is used so that the consume can ensure that the value was actually specified
+    INSERT = 1;
+    UPDATE = 2;
+    DELETE = 3;
+  }
+  Type type = 5;
+}
