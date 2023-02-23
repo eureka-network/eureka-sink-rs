@@ -18,24 +18,6 @@ pub struct Loader {
     table_primary_keys: HashMap<String, String>,
 }
 
-#[derive(QueryableByName)]
-// TODO: rename fields according to query outputs
-// TODO: add docs
-pub struct RawQueryPrimaryKey {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pk: String,
-}
-
-#[derive(QueryableByName)]
-pub struct RawQueryTableNames {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    table_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    column_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    column_type: String,
-}
-
 impl Loader {
     // TODO: set interface for extracting these values from environment variables
     pub fn new(path: PathBuf, database: String, schema: String) -> Result<Self, DBError> {
@@ -59,23 +41,31 @@ impl Loader {
     }
 
     pub fn load_tables(&mut self) -> Result<(), DBError> {
-        let query_all_tables = format!(
-            "
-            SELECT
+        #[derive(QueryableByName)]
+        pub struct TableMetadata {
+            #[diesel(sql_type = "Array<Text>")]
+            table_name: Vec<String>,
+            #[diesel(sql_type = "Array<Text>")]
+            column_name: Vec<String>,
+            #[diesel(sql_type = "Array<Text>")]
+            column_type: Vec<String>,
+        }
+
+        let query = " SELECT
                 TABLE_NAME AS table_name
                 , COLUMN_NAME AS column_name
                 , DATA_TYPE AS column_type
             FROM information_schema.columns
-            WHERE table_type = 'BASE TABLE' table_schema = '{}'
+            WHERE table_type = 'BASE TABLE' AND table_schema = '{}'
             ORDER BY
                 table_name
                 , column_name
                 , column_type;
-        ",
-            self.schema
-        );
-        let all_tables_and_cols = sql_query(query_all_tables)
-            .load::<RawQueryTableNames>(self.connection())
+        ";
+
+        let all_tables_and_cols = sql_query(query)
+            .bind::<Text, _>(self.schema)
+            .get_result::<TableMetadata>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
         let all_tables = all_tables_and_cols
@@ -87,12 +77,16 @@ impl Loader {
         for table in all_tables {
             let cols = all_tables_and_cols
                 .iter()
-                .filter(|q| q.table_name == table)
-                .map(|q| {
-                    (
-                        q.column_name.clone(),
-                        SqlTypeMap::try_from(q.column_type.as_str()).expect("Invalid field type"),
-                    )
+                .filter_map(|q| {
+                    if q.table_name == table {
+                        Some((
+                            q.column_name.clone(),
+                            SqlTypeMap::try_from(q.column_type.as_str())
+                                .expect("Invalid field type"),
+                        ))
+                    } else {
+                        None
+                    }
                 })
                 .collect::<HashMap<_, _>>();
 
@@ -233,20 +227,25 @@ impl Loader {
         &mut self,
         table: &str,
     ) -> Result<Vec<RawQueryPrimaryKey>, DBError> {
-        let query = format!(
-            "
-            SELECT a.attname as pk
+        #[derive(QueryableByName)]
+        // TODO: add docs
+        pub struct PrimaryKey {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pk: String,
+        }
+
+        let query = "SELECT a.attname as pk
             FROM   pg_index i
             JOIN   pg_attribute a ON a.attrelid = i.indrelid
                                 AND a.attnum = ANY(i.indkey)
-            WHERE  i.indrelid = '{}.{}'::regclass
+            WHERE  i.indrelid = '$1.$2'::regclass
             AND    i.indisprimary;
-        ",
-            self.schema, table
-        );
+        ";
 
         let result = sql_query(query)
-            .load::<RawQueryPrimaryKey>(self.connection())
+            .bind::<Text, _>(self.schema)
+            .bind::<Text, _>(table)
+            .get_result::<PrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
         Ok(result)
     }
