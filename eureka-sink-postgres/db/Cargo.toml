@@ -1,5 +1,5 @@
 [package]
-name = "substreams-postgres-sync"
+name = "eureka-sink-postgres"
 version = "0.1.0"
 edition = "2021"
 description = "Substreams Postgres synchronization"
