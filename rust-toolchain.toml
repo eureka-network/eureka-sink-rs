@@ -1,7 +1,3 @@
 [toolchain]
 channel = "1.64.0"
 components = [ "rustfmt" ]
-<<<<<<< HEAD
-targets = [ "wasm32-unknown-unknown" ]
-=======
->>>>>>> develop
