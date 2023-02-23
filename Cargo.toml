@@ -1,5 +1,10 @@
 [workspace]
-members = ["eureka-sink-postgres/db", "substreams-sink"]
+members = [
+    "eureka-sink-postgres/db",
+    "substreams-sink",
+    "substreams/eth-block-header",
+    "substreams/eth-balance"
+    ]
 
 [profile.release]
 opt-level = 2

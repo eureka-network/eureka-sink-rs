@@ -2,6 +2,9 @@
 channel = "1.64.0"
 components = [ "rustfmt" ]
 <<<<<<< HEAD
+<<<<<<< HEAD
 targets = [ "wasm32-unknown-unknown" ]
+=======
+>>>>>>> develop
 =======
 >>>>>>> develop
