@@ -215,7 +215,7 @@ impl Loader {
         Ok(())
     }
 
-    fn connection(&mut self) -> &mut PgConnection {
+    pub fn connection(&mut self) -> &mut PgConnection {
         &mut self.connection
     }
 
