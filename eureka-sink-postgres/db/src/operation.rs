@@ -96,6 +96,149 @@ impl Operation {
     }
 }
 
-// .bind::<<primary_key as SqlType>::T, _>(primary_key.inner)
-// .execute(connection)
-// .map_err(|e| DBError::DieselError(e))
+#[cfg(test)]
+mod tests {
+    use chrono::NaiveDate;
+
+    use crate::sql_types::{Binary, Date, Integer, Text};
+
+    use super::*;
+
+    #[test]
+    fn it_works_build_delete_query() {
+        let data = HashMap::from([
+            (
+                "col1".to_string(),
+                SqlType::Integer(Integer { inner: 10_u32 }),
+            ),
+            (
+                "col2".to_string(),
+                SqlType::Date(Date {
+                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                }),
+            ),
+            (
+                "col3".to_string(),
+                SqlType::Binary(Binary {
+                    inner: vec![0u8, 1, 2],
+                }),
+            ),
+        ]);
+
+        let operation = Operation::new(
+            "my_scheme".to_string(),
+            "my_table".to_string(),
+            "my_primary_key_column_name".to_string(),
+            OperationType::Delete,
+            SqlType::Text(Text {
+                inner: "field_to_delete".to_string(),
+            }),
+            data,
+        );
+
+        let query = operation.build_query();
+
+        assert_eq!(
+            query,
+            "DELETE FROM my_scheme.my_table WHERE my_primary_key_column_name = 'field_to_delete'"
+        );
+    }
+
+    #[test]
+    fn it_works_build_insert_into_query() {
+        let data = HashMap::from([
+            (
+                "col1".to_string(),
+                SqlType::Integer(Integer { inner: 10_u32 }),
+            ),
+            (
+                "col2".to_string(),
+                SqlType::Date(Date {
+                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                }),
+            ),
+            (
+                "col3".to_string(),
+                SqlType::Binary(Binary {
+                    inner: vec![0u8, 1, 2],
+                }),
+            ),
+        ]);
+
+        let operation = Operation::new(
+            "my_scheme".to_string(),
+            "my_table".to_string(),
+            "my_primary_key_column_name".to_string(),
+            OperationType::Insert,
+            SqlType::Text(Text {
+                inner: "field_to_delete".to_string(),
+            }),
+            data,
+        );
+
+        let query = operation.build_query();
+
+        // hash maps don't order store their (k, v) pairs
+        // for this reason, it is possible to have six, and only six,
+        // different queries
+        let possible_queries = [
+            "INSERT INTO my_scheme.my_table (col1,col2,col3) VALUES (10,'2023-03-01',[0, 1, 2])",
+            "INSERT INTO my_scheme.my_table (col2,col1,col3) VALUES ('2023-03-01',10,[0, 1, 2])",
+            "INSERT INTO my_scheme.my_table (col2,col3,col1) VALUES ('2023-03-01',[0, 1, 2],10)",
+            "INSERT INTO my_scheme.my_table (col3,col1,col2) VALUES ([0, 1, 2],10,'2023-03-01')",
+            "INSERT INTO my_scheme.my_table (col3,col2,col1) VALUES ([0, 1, 2],'2023-03-01',10)",
+            "INSERT INTO my_scheme.my_table (col1,col3,col2) VALUES (10,[0, 1, 2],'2023-03-01')",
+        ];
+
+        assert!(possible_queries.contains(&query.as_str()));
+    }
+
+    #[test]
+    fn it_works_build_update_query() {
+        let data = HashMap::from([
+            (
+                "col1".to_string(),
+                SqlType::Integer(Integer { inner: 10_u32 }),
+            ),
+            (
+                "col2".to_string(),
+                SqlType::Date(Date {
+                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                }),
+            ),
+            (
+                "col3".to_string(),
+                SqlType::Binary(Binary {
+                    inner: vec![0u8, 1, 2],
+                }),
+            ),
+        ]);
+
+        let operation = Operation::new(
+            "my_scheme".to_string(),
+            "my_table".to_string(),
+            "my_primary_key_column_name".to_string(),
+            OperationType::Update,
+            SqlType::Text(Text {
+                inner: "field_to_delete".to_string(),
+            }),
+            data,
+        );
+
+        let query = operation.build_query();
+
+        // hash maps don't order store their (k, v) pairs
+        // for this reason, it is possible to have six, and only six,
+        // different queries
+        let possible_queries = [
+            "UPDATE my_scheme.my_table SET col1=10,col2='2023-03-01',col3=[0, 1, 2] WHERE my_primary_key_column_name='field_to_delete'",
+            "UPDATE my_scheme.my_table SET col3=[0, 1, 2],col2='2023-03-01',col1=10 WHERE my_primary_key_column_name='field_to_delete'",
+            "UPDATE my_scheme.my_table SET col3=[0, 1, 2],col1=10,col2='2023-03-01' WHERE my_primary_key_column_name='field_to_delete'",
+            "UPDATE my_scheme.my_table SET col2='2023-03-01',col1=10,col3=[0, 1, 2] WHERE my_primary_key_column_name='field_to_delete'",
+            "UPDATE my_scheme.my_table SET col2='2023-03-01',col3=[0, 1, 2],col1=10 WHERE my_primary_key_column_name='field_to_delete'",
+            "UPDATE my_scheme.my_table SET col1=10,col3=[0, 1, 2],col2='2023-03-01' WHERE my_primary_key_column_name='field_to_delete'"
+        ];
+
+        assert!(possible_queries.contains(&query.as_str()));
+    }
+}

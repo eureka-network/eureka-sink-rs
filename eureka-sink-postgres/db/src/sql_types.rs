@@ -1,6 +1,5 @@
 use bigdecimal::BigDecimal;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use diesel::query_builder::SqlQuery;
 use std::convert::TryFrom;
 
 use crate::error::DBError;
@@ -13,7 +12,7 @@ pub trait Sql {
 
 #[derive(Debug, Clone)]
 pub struct Bool {
-    inner: bool,
+    pub inner: bool,
 }
 
 impl Sql for Bool {
@@ -26,7 +25,7 @@ impl Sql for Bool {
 
 #[derive(Debug, Clone)]
 pub struct SmallInt {
-    inner: u16,
+    pub inner: u16,
 }
 
 impl Sql for SmallInt {
@@ -41,7 +40,7 @@ pub type Int2 = SmallInt;
 
 #[derive(Debug, Clone)]
 pub struct Integer {
-    inner: u32,
+    pub inner: u32,
 }
 
 impl Sql for Integer {
@@ -56,7 +55,7 @@ pub type Int4 = Integer;
 
 #[derive(Debug, Clone)]
 pub struct BigInt {
-    inner: u64,
+    pub inner: u64,
 }
 
 impl Sql for BigInt {
@@ -71,7 +70,7 @@ pub type Int8 = BigInt;
 
 #[derive(Debug, Clone)]
 pub struct Float {
-    inner: f32,
+    pub inner: f32,
 }
 
 impl Sql for Float {
@@ -86,7 +85,7 @@ pub type Float4 = Float;
 
 #[derive(Debug, Clone)]
 pub struct Double {
-    inner: f64,
+    pub inner: f64,
 }
 
 impl Sql for Double {
@@ -101,7 +100,7 @@ pub type Float8 = Double;
 
 #[derive(Debug, Clone)]
 pub struct Numeric {
-    inner: BigDecimal,
+    pub inner: BigDecimal,
 }
 
 impl Sql for Numeric {
@@ -116,7 +115,7 @@ pub type Decimal = Numeric;
 
 #[derive(Debug, Clone)]
 pub struct Text {
-    inner: String,
+    pub inner: String,
 }
 
 impl Sql for Text {
@@ -139,7 +138,7 @@ pub type LongText = Text;
 
 #[derive(Debug, Clone)]
 pub struct Binary {
-    inner: Vec<u8>,
+    pub inner: Vec<u8>,
 }
 
 impl Sql for Binary {
@@ -164,7 +163,7 @@ pub type Bit = Binary;
 
 #[derive(Debug, Clone)]
 pub struct Date {
-    inner: NaiveDate,
+    pub inner: NaiveDate,
 }
 
 impl Sql for Date {
@@ -177,7 +176,7 @@ impl Sql for Date {
 
 #[derive(Debug, Clone)]
 pub struct Timestamp {
-    inner: NaiveDateTime,
+    pub inner: NaiveDateTime,
 }
 
 impl Sql for Timestamp {
@@ -190,7 +189,7 @@ impl Sql for Timestamp {
 
 #[derive(Debug, Clone)]
 pub struct Time {
-    inner: NaiveTime,
+    pub inner: NaiveTime,
 }
 
 impl Sql for Time {
@@ -203,7 +202,7 @@ impl Sql for Time {
 
 #[derive(Debug, Clone)]
 pub struct Interval {
-    inner: pg_interval::Interval,
+    pub inner: pg_interval::Interval,
 }
 
 impl Sql for Interval {
@@ -287,7 +286,7 @@ impl SqlType {
 }
 
 /// A native enumeration for diesel SQL types
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SqlTypeMap {
     Bool,
     SmallInt,
@@ -481,12 +480,12 @@ mod tests {
         assert_eq!(sql_bit.to_string(), "[0, 1, 2]".to_string());
 
         let sql_date = SqlType::Date(Date {
-            inner: NaiveDate::from_ymd(2023, 2, 22),
+            inner: NaiveDate::from_ymd_opt(2023, 2, 22).unwrap(),
         });
         assert_eq!(sql_date.to_string(), "'2023-02-22'");
 
         // let sql_interval = SqlType::Interval(Interval {
-        //     inner: pg_interval::Interval::from_postgres("1 years 1 months 1 days 1 hours").unwrap(),
+        //     pub inner: pg_interval::Interval::from_postgres("1 years 1 months 1 days 1 hours").unwrap(),
         // });
         // assert_eq!(
         //     sql_interval.to_string(),
@@ -505,5 +504,84 @@ mod tests {
                 .unwrap(),
         });
         assert_eq!(sql_timestamp.to_string(), "'2016-07-08 09:10:11'");
+    }
+
+    #[test]
+    fn test_sql_type_map_from_string() {
+        assert_eq!(SqlTypeMap::try_from("bool").unwrap(), SqlTypeMap::Bool);
+        assert_eq!(
+            SqlTypeMap::try_from("smallint").unwrap(),
+            SqlTypeMap::SmallInt
+        );
+        assert_eq!(SqlTypeMap::try_from("int2").unwrap(), SqlTypeMap::Int2);
+        assert_eq!(
+            SqlTypeMap::try_from("integer").unwrap(),
+            SqlTypeMap::Integer
+        );
+        assert_eq!(SqlTypeMap::try_from("int4").unwrap(), SqlTypeMap::Int4);
+        assert_eq!(SqlTypeMap::try_from("bigint").unwrap(), SqlTypeMap::BigInt);
+        assert_eq!(SqlTypeMap::try_from("int8").unwrap(), SqlTypeMap::Int8);
+        assert_eq!(SqlTypeMap::try_from("float").unwrap(), SqlTypeMap::Float);
+        assert_eq!(SqlTypeMap::try_from("float4").unwrap(), SqlTypeMap::Float4);
+        assert_eq!(SqlTypeMap::try_from("double").unwrap(), SqlTypeMap::Double);
+        assert_eq!(SqlTypeMap::try_from("float8").unwrap(), SqlTypeMap::Float8);
+        assert_eq!(
+            SqlTypeMap::try_from("numeric").unwrap(),
+            SqlTypeMap::Numeric
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("decimal").unwrap(),
+            SqlTypeMap::Decimal
+        );
+        assert_eq!(SqlTypeMap::try_from("text").unwrap(), SqlTypeMap::Text);
+        assert_eq!(
+            SqlTypeMap::try_from("varchar").unwrap(),
+            SqlTypeMap::VarChar
+        );
+        assert_eq!(SqlTypeMap::try_from("char").unwrap(), SqlTypeMap::Char);
+        assert_eq!(
+            SqlTypeMap::try_from("decimal").unwrap(),
+            SqlTypeMap::Decimal
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("tinytext").unwrap(),
+            SqlTypeMap::TinyText
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("mediumtext").unwrap(),
+            SqlTypeMap::MediumText
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("longtext").unwrap(),
+            SqlTypeMap::LongText
+        );
+        assert_eq!(SqlTypeMap::try_from("binary").unwrap(), SqlTypeMap::Binary);
+        assert_eq!(
+            SqlTypeMap::try_from("tinyblob").unwrap(),
+            SqlTypeMap::TinyBlob
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("mediumblob").unwrap(),
+            SqlTypeMap::MediumBlob
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("longblob").unwrap(),
+            SqlTypeMap::LongBlob
+        );
+        assert_eq!(
+            SqlTypeMap::try_from("varbinary").unwrap(),
+            SqlTypeMap::Varbinary
+        );
+        assert_eq!(SqlTypeMap::try_from("bit").unwrap(), SqlTypeMap::Bit);
+        assert_eq!(SqlTypeMap::try_from("date").unwrap(), SqlTypeMap::Date);
+        assert_eq!(
+            SqlTypeMap::try_from("interval").unwrap(),
+            SqlTypeMap::Interval
+        );
+        assert_eq!(SqlTypeMap::try_from("time").unwrap(), SqlTypeMap::Time);
+        assert_eq!(
+            SqlTypeMap::try_from("timestamp").unwrap(),
+            SqlTypeMap::Timestamp
+        );
     }
 }
