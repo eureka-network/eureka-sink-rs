@@ -215,6 +215,7 @@ impl Sql for Interval {
 
 /// A native enumeration for diesel SQL types
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum SqlType {
     Bool(Bool),
     SmallInt(SmallInt),
@@ -249,6 +250,7 @@ pub enum SqlType {
 }
 
 impl SqlType {
+    #[allow(dead_code)]
     pub fn to_string(&self) -> String {
         match self {
             Self::Bool(b) => format!("{}", b.get_inner()),
@@ -278,7 +280,7 @@ impl SqlType {
             Self::Varbinary(b) => format!("{:?}", b.get_inner()),
             Self::Bit(b) => format!("{:?}", b.get_inner()),
             Self::Date(d) => format!("'{}'", d.get_inner()),
-            Self::Interval(i) => panic!("Not implemented!"),
+            Self::Interval(_) => panic!("Not implemented!"),
             Self::Time(t) => format!("'{}'", t.get_inner()),
             Self::Timestamp(t) => format!("'{}'", t.get_inner()),
         }
