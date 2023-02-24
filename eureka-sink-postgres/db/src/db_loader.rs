@@ -98,7 +98,7 @@ impl Loader {
                 .collect::<HashMap<_, _>>();
 
             if table.as_str() == "cursors" {
-                self.validate_cursor_tables(cols.clone())?;
+                self.validate_cursor_table(cols.clone())?;
             }
 
             // update tables mapping
@@ -118,10 +118,24 @@ impl Loader {
         Ok(())
     }
 
-    pub fn validate_cursor_tables(
+    pub fn validate_cursor_table(
         &mut self,
         columns: HashMap<String, SqlTypeMap>,
     ) -> Result<(), DBError> {
+        Self::validate_cursor_table_columns(columns)?;
+
+        // check if primary key has correct name, and thus type
+        let pks = self.get_primary_key_from_table("cursors")?;
+        let pk = pks[0].pk.as_str();
+
+        if pk != "id" {
+            return Err(DBError::InvalidCursorColumnType);
+        }
+
+        Ok(())
+    }
+
+    fn validate_cursor_table_columns(columns: HashMap<String, SqlTypeMap>) -> Result<(), DBError> {
         if columns.len() != 4 {
             return Err(DBError::InvalidCursorColumns);
         }
@@ -159,14 +173,6 @@ impl Loader {
                 }
                 _ => return Err(DBError::InvalidCursorColumnType),
             }
-        }
-
-        // check if primary key has correct name, and thus type
-        let pks = self.get_primary_key_from_table("cursors")?;
-        let pk = pks[0].pk.as_str();
-
-        if pk != "id" {
-            return Err(DBError::InvalidCursorColumnType);
         }
 
         Ok(())
@@ -250,5 +256,21 @@ impl Loader {
             .load::<RawQueryPrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works_validate_cursor_tables() {
+        let columns = HashMap::from([
+            ("block_num".to_string(), SqlTypeMap::BigInt),
+            ("block_id".to_string(), SqlTypeMap::Text),
+            ("cursor".to_string(), SqlTypeMap::Text),
+            ("id".to_string(), SqlTypeMap::Text),
+        ]);
+        assert!(Loader::validate_cursor_table_columns(columns).is_ok());
     }
 }
