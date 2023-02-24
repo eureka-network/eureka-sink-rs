@@ -1,6 +1,7 @@
 use crate::{error::DBError, sql_types::SqlTypeMap};
 use crate::{operation::Operation, sql_types::BigInt};
 use diesel::{sql_query, sql_types, Connection, PgConnection, QueryableByName, RunQueryDsl};
+use dsn::DSN;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
@@ -38,11 +39,15 @@ pub struct RawQueryTableNames {
 
 impl Loader {
     // TODO: set interface for extracting these values from environment variables
-    pub fn new(path: PathBuf, database: String, schema: String) -> Result<Self, DBError> {
+    pub fn new(path: PathBuf, schema: String) -> Result<Self, DBError> {
         // TODO: do we need to create directory ?
         // create_dir_all(path.parent().unwrap())
         //     .map_err(|_| DBError::FileSystemPathDoesNotExist)?;
 
+        let database = dsn::parse(path.to_str().unwrap_or_default())
+            .map_err(|e| DBError::InvalidDSNParsing(e))?
+            .database
+            .unwrap_or_default();
         let database_url = path.to_str().expect("database_url utf-8 error");
         let connection =
             PgConnection::establish(database_url).map_err(|e| DBError::ConnectionError(e))?;
