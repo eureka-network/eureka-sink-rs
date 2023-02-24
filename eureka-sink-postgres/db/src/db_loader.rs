@@ -1,15 +1,18 @@
 use crate::operation::Operation;
 use crate::{error::DBError, sql_types::SqlTypeMap};
 use diesel::{sql_query, Connection, PgConnection, QueryableByName, RunQueryDsl};
+use std::ops::DerefMut;
+use std::sync::MutexGuard;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     path::PathBuf,
+    sync::{Arc, Mutex},
 };
 
 #[allow(dead_code)]
 pub struct Loader {
-    connection: PgConnection,
+    connection: Arc<Mutex<PgConnection>>,
     database: String,
     schema: String,
     entries: HashMap<String, HashMap<String, Operation>>,
@@ -40,17 +43,21 @@ pub struct RawQueryTableNames {
 #[allow(dead_code)]
 impl Loader {
     // TODO: set interface for extracting these values from environment variables
-    pub fn new(path: PathBuf, database: String, schema: String) -> Result<Self, DBError> {
+    pub fn new(path: PathBuf, schema: String) -> Result<Self, DBError> {
         // TODO: do we need to create directory ?
         // create_dir_all(path.parent().unwrap())
         //     .map_err(|_| DBError::FileSystemPathDoesNotExist)?;
 
+        let database = dsn::parse(path.to_str().unwrap_or_default())
+            .map_err(|e| DBError::InvalidDSNParsing(e))?
+            .database
+            .unwrap_or_default();
         let database_url = path.to_str().expect("database_url utf-8 error");
         let connection =
             PgConnection::establish(database_url).map_err(|e| DBError::ConnectionError(e))?;
 
         Ok(Self {
-            connection,
+            connection: Arc::new(Mutex::new(connection)),
             database,
             schema,
             entries: HashMap::new(),
@@ -58,6 +65,12 @@ impl Loader {
             tables: HashMap::new(),
             table_primary_keys: HashMap::new(),
         })
+    }
+
+    pub fn reset_entries_count(&mut self) -> u64 {
+        let entries_count = self.entries_count;
+        self.entries_count = 0;
+        entries_count
     }
 
     pub fn load_tables(&mut self) -> Result<(), DBError> {
@@ -77,7 +90,11 @@ impl Loader {
             self.schema
         );
         let all_tables_and_cols = sql_query(query_all_tables)
-            .load::<RawQueryTableNames>(self.connection())
+            .load::<RawQueryTableNames>(
+                self.connection()
+                    .expect("Failed to acquire lock")
+                    .deref_mut(),
+            )
             .map_err(|e| DBError::DieselError(e))?;
 
         let all_tables = all_tables_and_cols
@@ -215,21 +232,37 @@ impl Loader {
 		);
 	    ",
         )
-        .execute(self.connection())
+        .execute(
+            self.connection()
+                .expect("Failed to acquire lock")
+                .deref_mut(),
+        )
         .map_err(|e| DBError::DieselError(e))?;
 
         Ok(())
     }
 
-    pub fn connection(&mut self) -> &mut PgConnection {
-        &mut self.connection
+    pub(crate) fn connection(&self) -> Option<MutexGuard<PgConnection>> {
+        self.connection.lock().ok()
+    }
+
+    pub(crate) fn entries(&self) -> &HashMap<String, HashMap<String, Operation>> {
+        &self.entries
+    }
+
+    pub(crate) fn entries_mut(&mut self) -> &mut HashMap<String, HashMap<String, Operation>> {
+        &mut self.entries
     }
 
     fn setup_schema(&mut self, schema_file: PathBuf) -> Result<usize, DBError> {
         let schema_query =
             std::fs::read_to_string(schema_file).map_err(|e| DBError::InvalidSchemaPath(e))?;
         let count = sql_query(schema_query)
-            .execute(self.connection())
+            .execute(
+                self.connection()
+                    .expect("Failed to acquire lock")
+                    .deref_mut(),
+            )
             .map_err(|e| DBError::DieselError(e))?;
         // set a cursors table, as well
         self.set_up_cursor_table()?;
@@ -253,7 +286,11 @@ impl Loader {
         );
 
         let result = sql_query(query)
-            .load::<RawQueryPrimaryKey>(self.connection())
+            .load::<RawQueryPrimaryKey>(
+                self.connection()
+                    .expect("Failed to acquire lock")
+                    .deref_mut(),
+            )
             .map_err(|e| DBError::DieselError(e))?;
         Ok(result)
     }

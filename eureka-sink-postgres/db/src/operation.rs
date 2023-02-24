@@ -89,8 +89,6 @@ impl Operation {
         query
     }
 }
-<<<<<<< HEAD
-=======
 
 #[cfg(test)]
 mod tests {
@@ -238,4 +236,3 @@ mod tests {
         assert!(possible_queries.contains(&query.as_str()));
     }
 }
->>>>>>> develop

@@ -14,4 +14,19 @@ pub enum DBError {
     InvalidSchemaPath(#[from] std::io::Error),
     #[error("Invalid field type")]
     InvalidFieldType,
+    #[error("Invalid DNS parsing: {0}")]
+    InvalidDSNParsing(#[from] dsn::ParseError),
+    #[error("FailedToExecuteQuery: query = {query}, error = {error}")]
+    FailedToExecuteQuery { query: String, error: String },
 }
+
+// impl From<DBError> for diesel::result::Error {
+//     fn from(e: DBError) -> Self {
+//         match e {
+//             DBError::FailedToExecuteQuery { query, error } => {
+//                 Self::QueryBuilderError(Box::new(format!("query = {}, error = {}", query, error)))
+//             }
+//             _ => Self::QueryBuilderError(Box::new("Failed with diesel error")),
+//         }
+//     }
+// }

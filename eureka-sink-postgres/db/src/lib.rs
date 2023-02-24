@@ -1,3 +1,4 @@
+mod cursor;
 mod db_loader;
 mod error;
 mod flush;
