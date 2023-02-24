@@ -1,6 +1,5 @@
 use bigdecimal::BigDecimal;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use diesel::query_builder::SqlQuery;
 use std::convert::TryFrom;
 
 use crate::error::DBError;
@@ -216,6 +215,7 @@ impl Sql for Interval {
 
 /// A native enumeration for diesel SQL types
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum SqlType {
     Bool(Bool),
     SmallInt(SmallInt),

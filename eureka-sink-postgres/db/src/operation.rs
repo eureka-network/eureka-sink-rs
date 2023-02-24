@@ -1,10 +1,7 @@
-use crate::{
-    error::DBError,
-    sql_types::{Sql, SqlType},
-};
-use diesel::{sql_query, sql_types, PgConnection};
+use crate::sql_types::SqlType;
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 pub enum OperationType {
     Insert,
     Update,
@@ -20,6 +17,7 @@ pub struct Operation {
     data: HashMap<String, SqlType>, // mapping data row from columns -> field
 }
 
+#[allow(dead_code)]
 impl Operation {
     pub fn new(
         schema_name: String,
@@ -91,7 +89,3 @@ impl Operation {
         query
     }
 }
-
-// .bind::<<primary_key as SqlType>::T, _>(primary_key.inner)
-// .execute(connection)
-// .map_err(|e| DBError::DieselError(e))
