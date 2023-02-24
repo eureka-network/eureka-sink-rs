@@ -18,4 +18,17 @@ pub enum DBError {
     InvalidFieldType,
     #[error("Invalid DNS parsing: {0}")]
     InvalidDSNParsing(#[from] dsn::ParseError),
+    #[error("Table {0} not found")]
+    TableNotFound(String),
+    #[error(
+        "Primary key {primary_key} already scheduled for previous operation, on table {table_name}"
+    )]
+    PrimaryKeyAlreadyScheduleForOperation {
+        table_name: String,
+        primary_key: String,
+    },
+    #[error("Column {0} not found")]
+    ColumnNotFound(String),
+    #[error("Failed to parse value {0}")]
+    FailedParseString(String),
 }

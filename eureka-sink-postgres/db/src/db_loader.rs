@@ -1,14 +1,13 @@
+use crate::operation::Operation;
 use crate::{error::DBError, sql_types::SqlTypeMap};
-use crate::{operation::Operation, sql_types::BigInt};
-use diesel::{sql_query, sql_types, Connection, PgConnection, QueryableByName, RunQueryDsl};
-use dsn::DSN;
+use diesel::{sql_query, Connection, PgConnection, QueryableByName, RunQueryDsl};
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fs::create_dir_all,
     path::PathBuf,
 };
 
+#[allow(dead_code)]
 pub struct Loader {
     connection: PgConnection,
     database: String,
@@ -20,6 +19,7 @@ pub struct Loader {
 }
 
 #[derive(QueryableByName)]
+#[allow(dead_code)]
 // TODO: rename fields according to query outputs
 // TODO: add docs
 pub struct RawQueryPrimaryKey {
@@ -28,6 +28,7 @@ pub struct RawQueryPrimaryKey {
 }
 
 #[derive(QueryableByName)]
+#[allow(dead_code)]
 pub struct RawQueryTableNames {
     #[diesel(sql_type = diesel::sql_types::Text)]
     table_name: String,
@@ -37,6 +38,7 @@ pub struct RawQueryTableNames {
     column_type: String,
 }
 
+#[allow(dead_code)]
 impl Loader {
     // TODO: set interface for extracting these values from environment variables
     pub fn new(path: PathBuf, schema: String) -> Result<Self, DBError> {
@@ -88,7 +90,6 @@ impl Loader {
             .map(|q| q.table_name.clone())
             .collect::<HashSet<_>>();
 
-        let mut seen_cursor_table = false;
         for table in all_tables {
             let cols = all_tables_and_cols
                 .iter()
@@ -144,7 +145,7 @@ impl Loader {
             return Err(DBError::InvalidCursorColumns);
         }
 
-        let mut available_columns = vec!["block_num", "block_id", "cursor", "id"];
+        let available_columns = vec!["block_num", "block_id", "cursor", "id"];
         available_columns
             .iter()
             .map(|c| {
@@ -202,6 +203,24 @@ impl Loader {
 
     pub fn get_schema(&self) -> &String {
         &self.schema
+    }
+
+    pub fn get_primary_key_column_name(&self, table_name: &String) -> Option<String> {
+        self.table_primary_keys.get(table_name).cloned()
+    }
+
+    pub fn get_tables(&self) -> &HashMap<String, HashMap<String, SqlTypeMap>> {
+        &self.tables
+    }
+
+    pub(crate) fn get_entries_mut(&mut self) -> &mut HashMap<String, HashMap<String, Operation>> {
+        &mut self.entries
+    }
+
+    pub(crate) fn increase_entries_count(&mut self) -> u64 {
+        let entries_count = self.entries_count;
+        self.entries_count += 1;
+        entries_count
     }
 
     pub fn has_table(&self, table: &String) -> bool {
