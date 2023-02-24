@@ -279,7 +279,7 @@ impl SqlType {
             Self::Varbinary(b) => format!("{:?}", b.get_inner()),
             Self::Bit(b) => format!("{:?}", b.get_inner()),
             Self::Date(d) => format!("'{}'", d.get_inner()),
-            Self::Interval(i) => panic!("Not implemented!"),
+            Self::Interval(_i) => panic!("Not implemented!"),
             Self::Time(t) => format!("'{}'", t.get_inner()),
             Self::Timestamp(t) => format!("'{}'", t.get_inner()),
         }
@@ -481,7 +481,7 @@ mod tests {
         assert_eq!(sql_bit.to_string(), "[0, 1, 2]".to_string());
 
         let sql_date = SqlType::Date(Date {
-            inner: NaiveDate::from_ymd(2023, 2, 22),
+            inner: NaiveDate::from_ymd_opt(2023, 2, 22).unwrap(),
         });
         assert_eq!(sql_date.to_string(), "'2023-02-22'");
 
