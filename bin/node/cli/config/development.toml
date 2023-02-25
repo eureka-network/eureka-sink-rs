@@ -1,4 +1,0 @@
-firehose_endpoint = "http://176.9.62.58:9000"
-#package_file_name = "../../../substreams/eth-block-header/eth-block-header-v0.1.0.spkg"
-package_file_name = "../../../substreams/eth-balance/eth-balance-v0.1.0.spkg"
-module_name = "ingest"
