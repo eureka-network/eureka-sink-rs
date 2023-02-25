@@ -2,8 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DBError {
-    #[error("Invalid query")]
-    InvalidQuery,
     #[error("DieselError: {0}")]
     DieselError(#[from] diesel::result::Error),
     #[error("ConnectionError: {0}")]

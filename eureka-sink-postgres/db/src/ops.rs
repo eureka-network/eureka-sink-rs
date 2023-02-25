@@ -4,7 +4,7 @@ use crate::{
     db_loader::Loader,
     error::DBError,
     operation::{Operation, OperationType},
-    sql_types::{SqlType, SqlTypeMap},
+    sql_types::SqlType,
 };
 
 #[allow(dead_code)]
@@ -19,14 +19,15 @@ impl Loader {
         let primary_key_colname = self
             .get_primary_key_column_name(&table_name)
             .expect(format!("Primary key not found for current table {}", &table_name).as_str());
-        let primary_key_val = self.get_type(&table_name, &primary_key_colname, &primary_key)?;
+        let primary_key_val =
+            self.get_type(&table_name, &primary_key_colname, primary_key.clone())?;
         // get data correct field type
         let data = data
             .iter()
             .map(|(colname, val)| {
                 (
                     colname.clone(),
-                    self.get_type(&table_name, &colname, &val)
+                    self.get_type(&table_name, &colname, val.clone())
                         .expect("Invalid parsing of type"),
                 )
             })
@@ -62,7 +63,7 @@ impl Loader {
         &self,
         table_name: &String,
         column_name: &String,
-        value: &String,
+        value: String,
     ) -> Result<SqlType, DBError> {
         let table_cols = self
             .get_tables()
@@ -73,63 +74,7 @@ impl Loader {
             .get(column_name)
             .ok_or(DBError::ColumnNotFound(column_name.clone()))?;
 
-        Ok(match col_type {
-            SqlTypeMap::Bool => SqlType::Bool(crate::sql_types::Bool {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::SmallInt => SqlType::SmallInt(crate::sql_types::SmallInt {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Int2 => SqlType::Int2(crate::sql_types::Int2 {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::BigInt => SqlType::BigInt(crate::sql_types::BigInt {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Integer => SqlType::Integer(crate::sql_types::Integer {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Int4 => SqlType::Int4(crate::sql_types::Int4 {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Int8 => SqlType::Int8(crate::sql_types::Int8 {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Float => SqlType::Float(crate::sql_types::Float {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Float4 => SqlType::Float4(crate::sql_types::Float4 {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Float8 => SqlType::Float8(crate::sql_types::Float8 {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-            SqlTypeMap::Numeric => SqlType::Numeric(crate::sql_types::Numeric {
-                inner: value
-                    .parse()
-                    .map_err(|_| DBError::FailedParseString(value.clone()))?,
-            }),
-        })
+        SqlType::parse_type(col_type.clone(), value)
     }
 
     fn new_insert_operation(
