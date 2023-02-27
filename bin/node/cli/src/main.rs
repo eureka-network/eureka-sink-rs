@@ -3,7 +3,7 @@ use clap_serde_derive::{
     ClapSerde,
 };
 use std::{fs::File, io::Read};
-use substreams_sink::{pb::substreams::response::Message, SubstreamsSink};
+use substreams_sink::{pb::response::Message, SubstreamsSink};
 use tokio_stream::StreamExt;
 pub mod ingest {
     include!(concat!(env!("OUT_DIR"), "/sepana.ingest.v1.rs"));
@@ -86,7 +86,7 @@ async fn main() {
             Message::Data(data) => {
                 for output in data.outputs {
                     match output.data.unwrap() {
-                        substreams_sink::pb::substreams::module_output::Data::MapOutput(d) => {
+                        substreams_sink::pb::module_output::Data::MapOutput(d) => {
                             let ops: ingest::IngestOperations = decode(&d.value).unwrap();
                             println!("{}\n{:?}", d.type_url, ops);
                         }
