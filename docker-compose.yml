@@ -16,8 +16,6 @@ services:
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
     volumes:
       - ./devel/data/postgres:/var/lib/postgresql/data
-      # copy the sql script to create tables
-      # - ./tests/dbloader/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5432"]
       interval: 30s
