@@ -33,10 +33,10 @@ struct Config {
     #[clap(short, long)]
     module_name: String,
     /// Start block
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "0")]
     start_block: i64,
     /// End block
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "0")]
     end_block: u64,
 }
 
@@ -54,6 +54,16 @@ async fn main() {
         Config::from(&mut args.config)
     };
     println!("config - {:?}", config);
+
+    // Check required parameters until the macro is supported in clap-serde-derive merge
+    if config.firehose_endpoint.len() == 0
+        || config.package_file_name.len() == 0
+        || config.module_name.len() == 0
+        || (config.start_block == 0 && config.end_block == 0)
+    {
+        println!("Missing or invalid arguments. Use -h for help.");
+        return;
+    }
 
     let mut client = SubstreamsSink::connect(config.firehose_endpoint)
         .await
@@ -77,9 +87,8 @@ async fn main() {
                 for output in data.outputs {
                     match output.data.unwrap() {
                         substreams_sink::pb::substreams::module_output::Data::MapOutput(d) => {
-                            println!("{}", d.type_url);
                             let ops: ingest::IngestOperations = decode(&d.value).unwrap();
-                            println!("{:?}", ops);
+                            println!("{}\n{:?}", d.type_url, ops);
                         }
                         _ => {}
                     }
