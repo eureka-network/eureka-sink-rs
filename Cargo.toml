@@ -1,9 +1,10 @@
 [workspace]
 members = [
     "bin/node/cli",
-    "eureka-sink-postgres",
+    "eureka-sink-postgres/db",
     "substreams-sink",
 ]
 
 [profile.release]
 opt-level = 2
+# todo: set proper profile options https://doc.rust-lang.org/cargo/reference/profiles.html
