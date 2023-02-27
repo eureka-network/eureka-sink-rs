@@ -1,4 +1,4 @@
-create table block_meta
+create table if not exists block_meta
 (
     id          text not null constraint block_meta_pk primary key,
     at          text,
@@ -8,10 +8,3 @@ create table block_meta
     timestamp   text
 );
 
-create table cursors
-(
-    id        text not null constraint cursor_pk primary key,
-    cursor    text,
-    block_num bigint,
-    block_id  text
-);
