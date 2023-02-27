@@ -18,8 +18,6 @@ services:
       - ./devel/data/postgres:/var/lib/postgresql/data
       # copy the sql script to create tables
       - ./tests/dbloader/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-      # copy the current repo rust code
-      - ./:/eureka-sink-postgres/
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5432"]
       interval: 30s
@@ -38,14 +36,3 @@ services:
       - DATABASE_URL=postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable
     depends_on:
       - postgres
-  eureka-substreams-sink:
-    restart: on-failure
-    depends_on:
-        - postgres
-    environment: 
-        - DATABASE_URL=postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable
-    build: 
-      context: .
-      dockerfile: dev.dockerfile
-    ports:
-        - 8000:8000
