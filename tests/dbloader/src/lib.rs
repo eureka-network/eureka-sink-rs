@@ -18,10 +18,7 @@ fn it_works_start_db_loader() {
     let schema_namespace = String::from("public");
     let mut loader = Loader::new(String::from(DATABASE_URL), schema_namespace).unwrap();
 
-    let schema_file = PathBuf::try_from(
-        "/Users/jorgeantonio/dev/substreams-postgres-sync/tests/dbloader/sql/schema.sql",
-    )
-    .unwrap();
+    let schema_file = PathBuf::try_from("../../tests/dbloader/sql/schema.sql").unwrap();
     let count = loader.setup_schema(schema_file).unwrap();
 
     assert_eq!(count, 0);
