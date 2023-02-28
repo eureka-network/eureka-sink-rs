@@ -1,3 +1,4 @@
+use serial_test::serial;
 use std::{collections::HashMap, path::PathBuf};
 
 use eureka_sink_postgres::{
@@ -10,6 +11,7 @@ const DATABASE_URL: &str =
     "postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable";
 
 #[test]
+#[serial]
 fn dbloader_test() {
     let schema_namespace = String::from("public");
     let mut loader = Loader::new(String::from(DATABASE_URL), schema_namespace).unwrap();
@@ -22,6 +24,7 @@ fn dbloader_test() {
 }
 
 #[test]
+#[serial]
 fn it_works_load_tables() {
     let database_url = DATABASE_URL.to_string();
     let schema_namespace = String::from("public");
@@ -81,6 +84,7 @@ fn it_works_load_tables() {
 }
 
 #[test]
+#[serial]
 fn it_works_insert_operations() {
     let database_url = DATABASE_URL.to_string();
     let schema_namespace = String::from("public");
