@@ -1,4 +1,4 @@
-use diesel::{sql_query, FromSqlRow, QueryableByName, RunQueryDsl};
+use diesel::{sql_query, QueryableByName, RunQueryDsl};
 use std::ops::DerefMut;
 use substreams_sink::{BlockRef, Cursor};
 
@@ -19,7 +19,7 @@ impl CursorLoader for Loader {
         #[derive(QueryableByName, Clone)]
         struct CursorRow {
             #[diesel(sql_type = diesel::sql_types::Text)]
-            id: String,
+            _id: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
             cursor: String,
             #[diesel(sql_type = diesel::sql_types::BigInt)]
@@ -29,11 +29,11 @@ impl CursorLoader for Loader {
         }
 
         let query = format!(
-            "SELECT id, cursor, block_num, block_id FROM {}.cursors WHERE id = {}",
+            "SELECT id, cursor, block_num, block_id FROM {}.cursors WHERE id = $1",
             self.get_schema(),
-            output_module_hash
         );
         let cursor_rows = sql_query(query)
+            .bind::<diesel::sql_types::Text, _>(output_module_hash.clone())
             .load::<CursorRow>(
                 self.connection()
                     .expect("Failed to acquire lock")
@@ -65,7 +65,10 @@ impl CursorLoader for Loader {
         module_hash: String,
         cursor: Cursor,
     ) -> Result<usize, DBError> {
-        let query = "UPDATE cursors SET cursor = ?, block_num = ?, block_id = ? WHERE id = ?";
+        let query = format!(
+            "UPDATE {}.cursors SET cursor = $1, block_num = $2, block_id = $3 WHERE id = $4",
+            self.get_schema()
+        );
         sql_query(query)
             .bind::<diesel::sql_types::Text, _>(cursor.cursor)
             .bind::<diesel::sql_types::BigInt, _>(cursor.block.num as i64)
@@ -80,7 +83,10 @@ impl CursorLoader for Loader {
     }
 
     fn write_cursor(&mut self, module_hash: String, cursor: Cursor) -> Result<usize, DBError> {
-        let query = "INSERT INTO cursors (id, cursor, block_num, block_id) VALUES (?, ?, ?, ?)";
+        let query = format!(
+            "INSERT INTO {}.cursors (id, cursor, block_num, block_id) VALUES ($1, $2, $3, $4)",
+            self.get_schema()
+        );
         sql_query(query)
             .bind::<diesel::sql_types::Text, _>(module_hash)
             .bind::<diesel::sql_types::Text, _>(cursor.cursor)

@@ -1,10 +1,15 @@
 use diesel::{sql_query, RunQueryDsl};
+use substreams_sink::Cursor;
 
-use crate::{db_loader::Loader, error::DBError};
+use crate::{cursor::CursorLoader, db_loader::Loader, error::DBError};
+
+pub trait FlushLoader {
+    fn flush(&mut self, output_module_hash: String, cursor: Cursor) -> Result<(), DBError>;
+}
 
 #[allow(dead_code)]
-impl Loader {
-    fn flush(&mut self) -> Result<(), DBError> {
+impl FlushLoader for Loader {
+    fn flush(&mut self, output_module_hash: String, cursor: Cursor) -> Result<(), DBError> {
         self.connection()
             .expect("Failed to acquire lock")
             .build_transaction()
@@ -22,18 +27,21 @@ impl Loader {
                             })
                             .expect("Failed to execute query");
                     }
-
-                    // TODO: add cursor logic
                 });
                 Ok(())
             })
             .map_err(|e| DBError::DieselError(e))?;
 
-        self.reset().expect("Unable to reset loader");
+        // update the cursor table
+        self.update_cursor_query(output_module_hash, cursor)?;
+        // after flushing, we reset our operation entries
+        self.reset()?;
 
         Ok(())
     }
+}
 
+impl Loader {
     fn reset(&mut self) -> Result<(), DBError> {
         self.entries_mut().iter_mut().for_each(|(_, hm)| hm.clear());
         self.reset_entries_count();
