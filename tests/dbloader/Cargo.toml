@@ -2,7 +2,7 @@
 name = "test-eureka-sink-postgres"
 version = "0.1.0"
 edition = "2021"
-description = "Substreams Postgres synchronization"
+description = "postgres setup and loading tests"
 
 [dependencies]
 bigdecimal = "0.3.0"
@@ -12,3 +12,5 @@ dsn = "1.0.2"
 pg_interval = "0.4.2"
 thiserror = "1.0.38"
 eureka-sink-postgres = { path = "../../eureka-sink-postgres/db/"}
+
+[workspace]

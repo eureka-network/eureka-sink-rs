@@ -2,7 +2,6 @@
 members = [
     "eureka-sink-postgres/db",
     "substreams-sink",
-    "tests/dbloader"
 ]
 
 [profile.release]

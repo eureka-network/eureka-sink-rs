@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use eureka_sink_postgres::{
     db_loader::Loader,
@@ -14,7 +10,7 @@ const DATABASE_URL: &str =
     "postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable";
 
 #[test]
-fn it_works_start_db_loader() {
+fn dbloader_test() {
     let schema_namespace = String::from("public");
     let mut loader = Loader::new(String::from(DATABASE_URL), schema_namespace).unwrap();
 
@@ -31,10 +27,7 @@ fn it_works_load_tables() {
     let schema_namespace = String::from("public");
     let mut loader = Loader::new(database_url, schema_namespace).unwrap();
 
-    let schema_file = PathBuf::try_from(
-        "/Users/jorgeantonio/dev/substreams-postgres-sync/tests/dbloader/sql/schema.sql",
-    )
-    .unwrap();
+    let schema_file = PathBuf::try_from("../../tests/dbloader/sql/schema.sql").unwrap();
     loader.setup_schema(schema_file).unwrap();
 
     assert!(loader.load_tables().is_ok());
@@ -93,10 +86,7 @@ fn it_works_insert_operations() {
     let schema_namespace = String::from("public");
     let mut loader = Loader::new(database_url, schema_namespace).unwrap();
 
-    let schema_file = PathBuf::try_from(
-        "/Users/jorgeantonio/dev/substreams-postgres-sync/tests/dbloader/sql/schema.sql",
-    )
-    .unwrap();
+    let schema_file = PathBuf::try_from("../../tests/dbloader/sql/schema.sql").unwrap();
     loader.setup_schema(schema_file).unwrap();
 
     loader.load_tables().unwrap();

@@ -1,7 +1,6 @@
 use crate::operation::Operation;
 use crate::{error::DBError, sql_types::SqlTypeMap};
 use diesel::{sql_query, Connection, PgConnection, QueryableByName, RunQueryDsl};
-use std::hash::Hash;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
