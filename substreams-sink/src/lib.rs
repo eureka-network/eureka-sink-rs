@@ -4,6 +4,47 @@ pub mod pb {
 use pb::{stream_client::StreamClient, Request, Response};
 use tonic::{codegen::*, Status};
 
+#[derive(Debug)]
+pub struct BlockRef {
+    pub id: String,
+    pub num: u64,
+}
+
+impl BlockRef {
+    pub fn new(id: String, num: u64) -> Self {
+        Self { id, num }
+    }
+}
+#[derive(Debug)]
+pub struct Cursor {
+    pub cursor: String,
+    pub block: BlockRef,
+}
+
+impl Cursor {
+    pub fn new(cursor: String, block: BlockRef) -> Self {
+        Self { cursor, block }
+    }
+    pub fn new_blank_cursor() -> Self {
+        Cursor {
+            cursor: "".to_string(),
+            block: BlockRef {
+                id: "".to_string(),
+                num: 0,
+            },
+        }
+    }
+    pub fn is_blank(&self) -> bool {
+        self.cursor.len() == 0
+    }
+    pub fn is_equal_to(&self, other: &Self) -> bool {
+        self.cursor == other.cursor
+    }
+    pub fn to_string(&self) -> String {
+        self.cursor.clone()
+    }
+}
+
 pub struct SubstreamsSink<T> {
     inner: StreamClient<T>,
 }
