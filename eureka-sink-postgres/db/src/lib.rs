@@ -1,6 +1,7 @@
 mod cursor;
-mod db_loader;
+pub mod db_loader;
 mod error;
 mod flush;
-mod operation;
-mod sql_types;
+pub mod operation;
+mod ops;
+pub mod sql_types;

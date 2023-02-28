@@ -2,12 +2,15 @@ use crate::sql_types::SqlType;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum OperationType {
     Insert,
     Update,
     Delete,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Operation {
     schema_name: String,
     table_name: String,
@@ -87,6 +90,30 @@ impl Operation {
         };
 
         query
+    }
+
+    pub fn schema_name(&self) -> &String {
+        &self.schema_name
+    }
+
+    pub fn table_name(&self) -> &String {
+        &self.table_name
+    }
+
+    pub fn primary_key_column_name(&self) -> &String {
+        &self.primary_key_column_name
+    }
+
+    pub fn primary_key(&self) -> &SqlType {
+        &self.primary_key
+    }
+
+    pub fn op_type(&self) -> &OperationType {
+        &self.op_type
+    }
+
+    pub fn data(&self) -> &HashMap<String, SqlType> {
+        &self.data
     }
 }
 
