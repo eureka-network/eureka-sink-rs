@@ -286,7 +286,7 @@ impl SqlType {
         }
     }
 
-    pub(crate) fn parse_type(sql_type: SqlTypeMap, value: String) -> Result<Self, DBError> {
+    pub fn parse_type(sql_type: SqlTypeMap, value: String) -> Result<Self, DBError> {
         Ok(match sql_type {
             SqlTypeMap::Bool => SqlType::Bool(crate::sql_types::Bool {
                 inner: value

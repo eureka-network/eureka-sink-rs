@@ -1,5 +1,5 @@
-mod db_loader;
+pub mod db_loader;
 mod error;
-mod operation;
+pub mod operation;
 mod ops;
-mod sql_types;
+pub mod sql_types;
