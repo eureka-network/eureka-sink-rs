@@ -10,12 +10,12 @@ protobuf:
     files:
         - ingest.proto
     importPaths:
-        - ../../proto/sepana/ingest/v1
+        - ../../../proto/sepana/ingest/v1
 
 binaries:
     default:
         type: wasm/rust-v1
-        file: '../../target/wasm32-unknown-unknown/release/eth_block_header.wasm'
+        file: 'target/wasm32-unknown-unknown/release/eth_block_header.wasm'
 
 modules:
     - name: ingest
