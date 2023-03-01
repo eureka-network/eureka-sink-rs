@@ -10,137 +10,133 @@ pub trait Sql {
     type T;
     type Inner;
     fn get_inner(&self) -> &Self::Inner;
+    fn set_inner(inner: Self::Inner) -> Self;
+}
+
+macro_rules! sql_type_impl {
+    ($typ:ty, $ty:ty, $inner:ty) => {
+        impl Sql for $typ {
+            type T = $ty;
+            type Inner = $inner;
+            fn get_inner(&self) -> &Self::Inner {
+                &self.inner
+            }
+            fn set_inner(inner: Self::Inner) -> Self {
+                Self { inner }
+            }
+        }
+    };
 }
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Bool`] instance.
 pub struct Bool {
-    pub inner: bool,
-}
-
-impl Sql for Bool {
-    type T = diesel::sql_types::Bool;
-    type Inner = bool;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
+    inner: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`SmallInt`] instance.
 pub struct SmallInt {
-    pub inner: u16,
+    inner: u16,
 }
-
-impl Sql for SmallInt {
-    type T = diesel::sql_types::SmallInt;
-    type Inner = u16;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-/// A diesel compatible [`Int2`] instance.
-pub type Int2 = SmallInt;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Integer`] instance.
 pub struct Integer {
-    pub inner: u32,
+    inner: u32,
 }
-
-impl Sql for Integer {
-    type T = diesel::sql_types::Integer;
-    type Inner = u32;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-/// A diesel compatible [`Int4`] instance.
-pub type Int4 = Integer;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`BigInt`] instance.
 pub struct BigInt {
-    pub inner: u64,
+    inner: u64,
 }
-
-impl Sql for BigInt {
-    type T = diesel::sql_types::BigInt;
-    type Inner = u64;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-/// A diesel compatible [`Int8`] instance.
-pub type Int8 = BigInt;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Float`] instance.
 pub struct Float {
-    pub inner: f32,
+    inner: f32,
 }
-
-impl Sql for Float {
-    type T = diesel::sql_types::Float;
-    type Inner = f32;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-/// A diesel compatible [`Float4`] instance.
-pub type Float4 = Float;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Double`] instance.
 pub struct Double {
-    pub inner: f64,
+    inner: f64,
 }
-
-impl Sql for Double {
-    type T = diesel::sql_types::Double;
-    type Inner = f64;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-/// A diesel compatible [`Float8`] instance.
-pub type Float8 = Double;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Numeric`] instance.
 pub struct Numeric {
-    pub inner: BigDecimal,
+    inner: BigDecimal,
 }
-
-impl Sql for Numeric {
-    type T = diesel::sql_types::Numeric;
-    type Inner = BigDecimal;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-/// A diesel compatible [`Decimal`] instance.
-pub type Decimal = Numeric;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Text`] instance.
 pub struct Text {
-    pub inner: String,
+    inner: String,
 }
 
-impl Sql for Text {
-    type T = diesel::sql_types::Text;
-    type Inner = String;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
+#[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Binary`] instance.
+pub struct Binary {
+    inner: Vec<u8>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Date`] instance.
+pub struct Date {
+    inner: NaiveDate,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Timestamp`] instance.
+pub struct Timestamp {
+    inner: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Time`] instance.
+pub struct Time {
+    inner: NaiveTime,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Interval`] instance.
+pub struct Interval {
+    inner: pg_interval::Interval,
+}
+
+sql_type_impl!(Bool, diesel::sql_types::Bool, bool);
+sql_type_impl!(SmallInt, diesel::sql_types::SmallInt, u16);
+sql_type_impl!(Integer, diesel::sql_types::Integer, u32);
+sql_type_impl!(BigInt, diesel::sql_types::BigInt, u64);
+sql_type_impl!(Float, diesel::sql_types::Float, f32);
+sql_type_impl!(Double, diesel::sql_types::Double, f64);
+sql_type_impl!(Numeric, diesel::sql_types::Numeric, BigDecimal);
+sql_type_impl!(Text, diesel::sql_types::Text, String);
+sql_type_impl!(Binary, diesel::sql_types::Binary, Vec<u8>);
+sql_type_impl!(Date, diesel::sql_types::Date, NaiveDate);
+sql_type_impl!(Timestamp, diesel::sql_types::Timestamp, NaiveDateTime);
+sql_type_impl!(Time, diesel::sql_types::Time, NaiveTime);
+sql_type_impl!(Interval, diesel::sql_types::Interval, pg_interval::Interval);
+
+/// A diesel compatible [`Int2`] instance.
+pub type Int2 = SmallInt;
+
+/// A diesel compatible [`Int4`] instance.
+pub type Int4 = Integer;
+
+/// A diesel compatible [`Int8`] instance.
+pub type Int8 = BigInt;
+
+/// A diesel compatible [`Float4`] instance.
+pub type Float4 = Float;
+
+/// A diesel compatible [`Float8`] instance.
+pub type Float8 = Double;
+
+/// A diesel compatible [`Decimal`] instance.
+pub type Decimal = Numeric;
 
 /// A diesel compatible [`VarChar`] instance.
 pub type VarChar = Text;
@@ -156,20 +152,6 @@ pub type MediumText = Text;
 
 /// A diesel compatible [`LongText`] instance.
 pub type LongText = Text;
-
-#[derive(Debug, Clone, PartialEq)]
-/// A diesel compatible [`Binary`] instance.
-pub struct Binary {
-    pub inner: Vec<u8>,
-}
-
-impl Sql for Binary {
-    type T = diesel::sql_types::Binary;
-    type Inner = Vec<u8>;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
 
 /// A diesel compatible [`TinyBlob`] instance.
 pub type TinyBlob = Binary;
@@ -188,62 +170,6 @@ pub type Varbinary = Binary;
 
 /// A diesel compatible [`Bit`] instance.
 pub type Bit = Binary;
-
-#[derive(Debug, Clone, PartialEq)]
-/// A diesel compatible [`Date`] instance.
-pub struct Date {
-    pub inner: NaiveDate,
-}
-
-impl Sql for Date {
-    type T = diesel::sql_types::Date;
-    type Inner = NaiveDate;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// A diesel compatible [`Timestamp`] instance.
-pub struct Timestamp {
-    pub inner: NaiveDateTime,
-}
-
-impl Sql for Timestamp {
-    type T = diesel::sql_types::Timestamp;
-    type Inner = NaiveDateTime;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// A diesel compatible [`Time`] instance.
-pub struct Time {
-    pub inner: NaiveTime,
-}
-
-impl Sql for Time {
-    type T = diesel::sql_types::Time;
-    type Inner = NaiveTime;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// A diesel compatible [`Interval`] instance.
-pub struct Interval {
-    pub inner: pg_interval::Interval,
-}
-
-impl Sql for Interval {
-    type T = diesel::sql_types::Interval;
-    type Inner = pg_interval::Interval;
-    fn get_inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]

@@ -131,7 +131,7 @@ impl Operation {
 mod tests {
     use chrono::NaiveDate;
 
-    use crate::sql_types::{Binary, Date, Integer, Text};
+    use crate::sql_types::{Binary, Date, Integer, Sql, Text};
 
     use super::*;
 
@@ -140,19 +140,17 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                ColumnValue::Integer(Integer { inner: 10_u32 }),
+                ColumnValue::Integer(Integer::set_inner(10)),
             ),
             (
                 "col2".to_string(),
-                ColumnValue::Date(Date {
-                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
-                }),
+                ColumnValue::Date(Date::set_inner(
+                    NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                )),
             ),
             (
                 "col3".to_string(),
-                ColumnValue::Binary(Binary {
-                    inner: vec![0u8, 1, 2],
-                }),
+                ColumnValue::Binary(Binary::set_inner(vec![0u8, 1, 2])),
             ),
         ]);
 
@@ -161,9 +159,7 @@ mod tests {
             "my_table".to_string(),
             "my_primary_key_column_name".to_string(),
             OperationType::Delete,
-            ColumnValue::Text(Text {
-                inner: "field_to_delete".to_string(),
-            }),
+            ColumnValue::Text(Text::set_inner("field_to_delete".to_string())),
             data,
         );
 
@@ -180,19 +176,17 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                ColumnValue::Integer(Integer { inner: 10_u32 }),
+                ColumnValue::Integer(Integer::set_inner(10)),
             ),
             (
                 "col2".to_string(),
-                ColumnValue::Date(Date {
-                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
-                }),
+                ColumnValue::Date(Date::set_inner(
+                    NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                )),
             ),
             (
                 "col3".to_string(),
-                ColumnValue::Binary(Binary {
-                    inner: vec![0u8, 1, 2],
-                }),
+                ColumnValue::Binary(Binary::set_inner(vec![0u8, 1, 2])),
             ),
         ]);
 
@@ -201,9 +195,7 @@ mod tests {
             "my_table".to_string(),
             "my_primary_key_column_name".to_string(),
             OperationType::Insert,
-            ColumnValue::Text(Text {
-                inner: "field_to_delete".to_string(),
-            }),
+            ColumnValue::Text(Text::set_inner("field_to_delete".to_string())),
             data,
         );
 
@@ -229,19 +221,17 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                ColumnValue::Integer(Integer { inner: 10_u32 }),
+                ColumnValue::Integer(Integer::set_inner(10_u32)),
             ),
             (
                 "col2".to_string(),
-                ColumnValue::Date(Date {
-                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
-                }),
+                ColumnValue::Date(Date::set_inner(
+                    NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                )),
             ),
             (
                 "col3".to_string(),
-                ColumnValue::Binary(Binary {
-                    inner: vec![0u8, 1, 2],
-                }),
+                ColumnValue::Binary(Binary::set_inner(vec![0u8, 1, 2])),
             ),
         ]);
 
@@ -250,9 +240,7 @@ mod tests {
             "my_table".to_string(),
             "my_primary_key_column_name".to_string(),
             OperationType::Update,
-            ColumnValue::Text(Text {
-                inner: "field_to_delete".to_string(),
-            }),
+            ColumnValue::Text(Text::set_inner("field_to_delete".to_string())),
             data,
         );
 
