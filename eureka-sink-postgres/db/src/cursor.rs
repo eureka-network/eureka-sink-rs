@@ -37,13 +37,7 @@ impl CursorLoader for Loader {
             .load::<CursorRow>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
-        if cursor_rows.is_empty() {
-            return Err(DBError::EmptyQuery(output_module_hash));
-        }
-
-        // At this point, we already checked that the query is not empty. Moreover,
-        // selecting on the primary key, defines a unique mapping,
-        // therefore cursor_rows.len() == 1
+        // Selecting on the primary key defines a unique mapping,
         let cursor_row = cursor_rows
             .first()
             .ok_or(DBError::EmptyQuery(output_module_hash))?
