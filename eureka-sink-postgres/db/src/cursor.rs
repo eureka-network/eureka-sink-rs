@@ -1,5 +1,4 @@
 use diesel::{sql_query, QueryableByName, RunQueryDsl};
-use std::ops::DerefMut;
 use substreams_sink::{BlockRef, Cursor};
 
 use crate::{db_loader::Loader, error::DBError};
@@ -18,8 +17,9 @@ impl CursorLoader for Loader {
     fn get_cursor(&mut self, output_module_hash: String) -> Result<Cursor, DBError> {
         #[derive(QueryableByName, Clone)]
         struct CursorRow {
+            #[allow(dead_code)]
             #[diesel(sql_type = diesel::sql_types::Text)]
-            _id: String,
+            id: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
             cursor: String,
             #[diesel(sql_type = diesel::sql_types::BigInt)]
@@ -34,11 +34,7 @@ impl CursorLoader for Loader {
         );
         let cursor_rows = sql_query(query)
             .bind::<diesel::sql_types::Text, _>(output_module_hash.clone())
-            .load::<CursorRow>(
-                self.connection()
-                    .expect("Failed to acquire lock")
-                    .deref_mut(),
-            )
+            .load::<CursorRow>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
         if cursor_rows.is_empty() {
@@ -74,11 +70,7 @@ impl CursorLoader for Loader {
             .bind::<diesel::sql_types::BigInt, _>(cursor.block.num as i64)
             .bind::<diesel::sql_types::Text, _>(cursor.block.id)
             .bind::<diesel::sql_types::Text, _>(module_hash)
-            .execute(
-                self.connection()
-                    .expect("Failed to acquire lock")
-                    .deref_mut(),
-            )
+            .execute(self.connection())
             .map_err(|e| DBError::DieselError(e))
     }
 
@@ -92,11 +84,7 @@ impl CursorLoader for Loader {
             .bind::<diesel::sql_types::Text, _>(cursor.cursor)
             .bind::<diesel::sql_types::BigInt, _>(cursor.block.num as i64)
             .bind::<diesel::sql_types::Text, _>(cursor.block.id)
-            .execute(
-                self.connection()
-                    .expect("Failed to acquire lock")
-                    .deref_mut(),
-            )
+            .execute(self.connection())
             .map_err(|e| DBError::DieselError(e))
     }
 }

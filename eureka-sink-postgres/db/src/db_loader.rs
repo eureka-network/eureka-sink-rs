@@ -1,18 +1,15 @@
 use crate::operation::Operation;
 use crate::{error::DBError, sql_types::SqlTypeMap};
 use diesel::{sql_query, Connection, PgConnection, QueryableByName, RunQueryDsl};
-use std::ops::DerefMut;
-use std::sync::MutexGuard;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     path::PathBuf,
-    sync::{Arc, Mutex},
 };
 
 #[allow(dead_code)]
 pub struct Loader {
-    connection: Arc<Mutex<PgConnection>>,
+    connection: PgConnection,
     database: String,
     schema: String,
     entries: HashMap<String, HashMap<String, Operation>>,
@@ -57,7 +54,7 @@ impl Loader {
             .map_err(|e| DBError::ConnectionError(e))?;
 
         Ok(Self {
-            connection: Arc::new(Mutex::new(connection)),
+            connection: connection,
             database,
             schema: schema_namespace,
             entries: HashMap::new(),
@@ -90,11 +87,7 @@ impl Loader {
             self.schema
         );
         let all_tables_and_cols = sql_query(query_all_tables)
-            .load::<RawQueryTableNames>(
-                self.connection()
-                    .expect("Failed to acquire lock")
-                    .deref_mut(),
-            )
+            .load::<RawQueryTableNames>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
         let all_tables = all_tables_and_cols
@@ -251,18 +244,14 @@ impl Loader {
 		);
 	    ",
         )
-        .execute(
-            self.connection()
-                .expect("Failed to acquire lock")
-                .deref_mut(),
-        )
+        .execute(self.connection())
         .map_err(|e| DBError::DieselError(e))?;
 
         Ok(())
     }
 
-    pub(crate) fn connection(&self) -> Option<MutexGuard<PgConnection>> {
-        self.connection.lock().ok()
+    pub(crate) fn connection(&mut self) -> &mut PgConnection {
+        &mut self.connection
     }
 
     pub(crate) fn entries(&self) -> &HashMap<String, HashMap<String, Operation>> {
@@ -277,11 +266,7 @@ impl Loader {
         let setup_query =
             std::fs::read_to_string(setup_file).map_err(|e| DBError::InvalidSchemaPath(e))?;
         let count = sql_query(setup_query)
-            .execute(
-                self.connection()
-                    .expect("Unable to retrieve Pg connection")
-                    .deref_mut(),
-            )
+            .execute(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
         // set a cursors table, as well
         self.set_up_cursor_table()?;
@@ -302,11 +287,7 @@ impl Loader {
         );
 
         let result = sql_query(query)
-            .load::<RawQueryPrimaryKey>(
-                self.connection()
-                    .expect("Failed to acquire lock")
-                    .deref_mut(),
-            )
+            .load::<RawQueryPrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
         Ok(result.iter().map(|q| q.pk.clone()).collect::<Vec<String>>())
     }

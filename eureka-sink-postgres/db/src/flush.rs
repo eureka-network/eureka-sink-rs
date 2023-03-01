@@ -10,12 +10,12 @@ pub trait FlushLoader {
 #[allow(dead_code)]
 impl FlushLoader for Loader {
     fn flush(&mut self, output_module_hash: String, cursor: Cursor) -> Result<(), DBError> {
+        let entries = self.entries().clone();
         self.connection()
-            .expect("Failed to acquire lock")
             .build_transaction()
             .read_write()
             .run::<_, diesel::result::Error, _>(|conn| {
-                self.entries().values().for_each(|ops| {
+                entries.values().for_each(|ops| {
                     for op in ops.values() {
                         let query = op.build_query();
                         // execute the query to the database
