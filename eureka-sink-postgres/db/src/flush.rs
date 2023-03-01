@@ -28,12 +28,13 @@ impl FlushLoader for Loader {
                             .expect("Failed to execute query");
                     }
                 });
+                // update the cursor table
+                self.update_cursor_query(output_module_hash, cursor)
+                    .expect("Failed to update the cursors table");
                 Ok(())
             })
             .map_err(|e| DBError::DieselError(e))?;
 
-        // update the cursor table
-        self.update_cursor_query(output_module_hash, cursor)?;
         // after flushing, we reset our operation entries
         self.reset()?;
 
