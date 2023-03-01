@@ -11,8 +11,9 @@ pub trait FlushLoader {
 impl FlushLoader for Loader {
     fn flush(&mut self, output_module_hash: String, cursor: Cursor) -> Result<(), DBError> {
         let entries = self.entries().clone();
-        if let Err(e) = self
-            .connection()
+        let schema = self.get_schema().clone();
+
+        self.connection()
             .build_transaction()
             .read_write()
             .run::<_, diesel::result::Error, _>(|conn| {
@@ -29,16 +30,12 @@ impl FlushLoader for Loader {
                             .expect("Failed to execute query");
                     }
                 });
+                // update the cursors table
+                Self::update_cursor_query(&schema, output_module_hash, cursor, conn)
+                    .expect("Failed to update cursors table");
                 Ok(())
             })
-            .map_err(|e| DBError::DieselError(e))
-        {
-            // if the transaction failed, we error
-            return Err(e);
-        } else {
-            // otherwise, it is safe to update the cursors table
-            self.update_cursor_query(output_module_hash, cursor)?;
-        }
+            .map_err(|e| DBError::DieselError(e))?;
 
         // after flushing, we reset our operation entries
         self.reset()?;
