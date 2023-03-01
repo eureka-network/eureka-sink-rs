@@ -1,16 +1,16 @@
-use crate::{
-    error::DBError,
-    sql_types::{Sql, SqlType},
-};
-use diesel::{sql_query, sql_types, PgConnection};
+use crate::sql_types::SqlType;
 use std::collections::HashMap;
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum OperationType {
     Insert,
     Update,
     Delete,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Operation {
     schema_name: String,
     table_name: String,
@@ -20,6 +20,7 @@ pub struct Operation {
     data: HashMap<String, SqlType>, // mapping data row from columns -> field
 }
 
+#[allow(dead_code)]
 impl Operation {
     pub fn new(
         schema_name: String,
@@ -56,13 +57,10 @@ impl Operation {
                 let mut values = "".to_string();
 
                 // TODO: write this in a more idiomatic way
-                self.data
-                    .iter()
-                    .map(|(k, v)| {
-                        keys.push_str(format!(",{}", k).as_str());
-                        values.push_str(format!(",{}", v.to_string()).as_str());
-                    })
-                    .collect::<Vec<()>>();
+                self.data.iter().for_each(|(k, v)| {
+                    keys.push_str(format!(",{}", k).as_str());
+                    values.push_str(format!(",{}", v.to_string()).as_str());
+                });
                 // remove extra initial ','
                 keys.remove(0); // ,col1,col2,col3,col4 -> col1,col2,col3,col4
                 values.remove(0); //
@@ -75,10 +73,9 @@ impl Operation {
             OperationType::Update => {
                 let mut updates = "".to_string();
                 // TODO; write this more idiomatically
-                self.data
-                    .iter()
-                    .map(|(k, v)| updates.push_str(format!(",{}={}", k, v.to_string()).as_str()))
-                    .collect::<Vec<()>>();
+                self.data.iter().for_each(|(k, v)| {
+                    updates.push_str(format!(",{}={}", k, v.to_string()).as_str())
+                });
                 // remove extra initial ','
                 updates.remove(0);
                 format!(
@@ -93,6 +90,30 @@ impl Operation {
         };
 
         query
+    }
+
+    pub fn schema_name(&self) -> &String {
+        &self.schema_name
+    }
+
+    pub fn table_name(&self) -> &String {
+        &self.table_name
+    }
+
+    pub fn primary_key_column_name(&self) -> &String {
+        &self.primary_key_column_name
+    }
+
+    pub fn primary_key(&self) -> &SqlType {
+        &self.primary_key
+    }
+
+    pub fn op_type(&self) -> &OperationType {
+        &self.op_type
+    }
+
+    pub fn data(&self) -> &HashMap<String, SqlType> {
+        &self.data
     }
 }
 

@@ -1,0 +1,12 @@
+[package]
+name = "test-eureka-sink-postgres"
+version = "0.1.0"
+edition = "2021"
+description = "postgres setup and loading tests"
+
+[dependencies]
+eureka-sink-postgres = { path = "../../eureka-sink-postgres/db/"}
+serial_test = "1.0.0"
+substreams-sink = { path = "../../substreams-sink" }
+
+[workspace]
