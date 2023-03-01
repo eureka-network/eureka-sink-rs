@@ -4,6 +4,8 @@ use std::convert::TryFrom;
 
 use crate::error::DBError;
 
+/// Trait to express interface to deal with our custom diesel
+/// type versions.
 pub trait Sql {
     type T;
     type Inner;
@@ -11,6 +13,7 @@ pub trait Sql {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Bool`] instance.
 pub struct Bool {
     pub inner: bool,
 }
@@ -24,6 +27,7 @@ impl Sql for Bool {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`SmallInt`] instance.
 pub struct SmallInt {
     pub inner: u16,
 }
@@ -36,9 +40,11 @@ impl Sql for SmallInt {
     }
 }
 
+/// A diesel compatible [`Int2`] instance.
 pub type Int2 = SmallInt;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Integer`] instance.
 pub struct Integer {
     pub inner: u32,
 }
@@ -51,9 +57,11 @@ impl Sql for Integer {
     }
 }
 
+/// A diesel compatible [`Int4`] instance.
 pub type Int4 = Integer;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`BigInt`] instance.
 pub struct BigInt {
     pub inner: u64,
 }
@@ -66,9 +74,11 @@ impl Sql for BigInt {
     }
 }
 
+/// A diesel compatible [`Int8`] instance.
 pub type Int8 = BigInt;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Float`] instance.
 pub struct Float {
     pub inner: f32,
 }
@@ -81,9 +91,11 @@ impl Sql for Float {
     }
 }
 
+/// A diesel compatible [`Float4`] instance.
 pub type Float4 = Float;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Double`] instance.
 pub struct Double {
     pub inner: f64,
 }
@@ -96,9 +108,11 @@ impl Sql for Double {
     }
 }
 
+/// A diesel compatible [`Float8`] instance.
 pub type Float8 = Double;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Numeric`] instance.
 pub struct Numeric {
     pub inner: BigDecimal,
 }
@@ -111,9 +125,11 @@ impl Sql for Numeric {
     }
 }
 
+/// A diesel compatible [`Decimal`] instance.
 pub type Decimal = Numeric;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Text`] instance.
 pub struct Text {
     pub inner: String,
 }
@@ -126,17 +142,23 @@ impl Sql for Text {
     }
 }
 
+/// A diesel compatible [`VarChar`] instance.
 pub type VarChar = Text;
 
+/// A diesel compatible [`Char`] instance.
 pub type Char = Text;
 
+/// A diesel compatible [`TinyText`] instance.
 pub type TinyText = Text;
 
+/// A diesel compatible [`MediumText`] instance.
 pub type MediumText = Text;
 
+/// A diesel compatible [`LongText`] instance.
 pub type LongText = Text;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Binary`] instance.
 pub struct Binary {
     pub inner: Vec<u8>,
 }
@@ -149,19 +171,26 @@ impl Sql for Binary {
     }
 }
 
+/// A diesel compatible [`TinyBlob`] instance.
 pub type TinyBlob = Binary;
 
+/// A diesel compatible [`Blob`] instance.
 pub type Blob = Binary;
 
+/// A diesel compatible [`MediumBlob`] instance.
 pub type MediumBlob = Binary;
 
+/// A diesel compatible [`LongBlob`] instance.
 pub type LongBlob = Binary;
 
+/// A diesel compatible [`Varbinary`] instance.
 pub type Varbinary = Binary;
 
+/// A diesel compatible [`Bit`] instance.
 pub type Bit = Binary;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Date`] instance.
 pub struct Date {
     pub inner: NaiveDate,
 }
@@ -175,6 +204,7 @@ impl Sql for Date {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Timestamp`] instance.
 pub struct Timestamp {
     pub inner: NaiveDateTime,
 }
@@ -188,6 +218,7 @@ impl Sql for Timestamp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Time`] instance.
 pub struct Time {
     pub inner: NaiveTime,
 }
@@ -201,6 +232,7 @@ impl Sql for Time {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// A diesel compatible [`Interval`] instance.
 pub struct Interval {
     pub inner: pg_interval::Interval,
 }
@@ -213,10 +245,11 @@ impl Sql for Interval {
     }
 }
 
-/// A native enumeration for diesel SQL types
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
-pub enum SqlType {
+/// [`ColumnValue`] encapsulates a list of our custom diesel
+/// compatible types.
+pub enum ColumnValue {
     Bool(Bool),
     SmallInt(SmallInt),
     Int2(Int2),
@@ -249,8 +282,11 @@ pub enum SqlType {
     Timestamp(Timestamp),
 }
 
-impl SqlType {
+impl ColumnValue {
     #[allow(dead_code)]
+    /// Given an instance of [`ColumnValue`] it produces
+    /// a string with its value, ready to be formatted
+    /// in a SQL query.
     pub fn to_string(&self) -> String {
         match self {
             Self::Bool(b) => format!("{}", b.get_inner()),
@@ -286,134 +322,136 @@ impl SqlType {
         }
     }
 
-    pub fn parse_type(sql_type: SqlTypeMap, value: String) -> Result<Self, DBError> {
+    /// Given a [`ColumnType`] and a value of type [`String`], it tries to parse
+    /// the correct value as a [`ColumnValue`] instance.
+    pub fn parse_type(sql_type: ColumnType, value: String) -> Result<Self, DBError> {
         Ok(match sql_type {
-            SqlTypeMap::Bool => SqlType::Bool(crate::sql_types::Bool {
+            ColumnType::Bool => ColumnValue::Bool(crate::sql_types::Bool {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::SmallInt => SqlType::SmallInt(crate::sql_types::SmallInt {
+            ColumnType::SmallInt => ColumnValue::SmallInt(crate::sql_types::SmallInt {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Int2 => SqlType::Int2(crate::sql_types::Int2 {
+            ColumnType::Int2 => ColumnValue::Int2(crate::sql_types::Int2 {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::BigInt => SqlType::BigInt(crate::sql_types::BigInt {
+            ColumnType::BigInt => ColumnValue::BigInt(crate::sql_types::BigInt {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Integer => SqlType::Integer(crate::sql_types::Integer {
+            ColumnType::Integer => ColumnValue::Integer(crate::sql_types::Integer {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Int4 => SqlType::Int4(crate::sql_types::Int4 {
+            ColumnType::Int4 => ColumnValue::Int4(crate::sql_types::Int4 {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Int8 => SqlType::Int8(crate::sql_types::Int8 {
+            ColumnType::Int8 => ColumnValue::Int8(crate::sql_types::Int8 {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Float => SqlType::Float(crate::sql_types::Float {
+            ColumnType::Float => ColumnValue::Float(crate::sql_types::Float {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Float4 => SqlType::Float4(crate::sql_types::Float4 {
+            ColumnType::Float4 => ColumnValue::Float4(crate::sql_types::Float4 {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Double => SqlType::Double(crate::sql_types::Double {
+            ColumnType::Double => ColumnValue::Double(crate::sql_types::Double {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Float8 => SqlType::Float8(crate::sql_types::Float8 {
+            ColumnType::Float8 => ColumnValue::Float8(crate::sql_types::Float8 {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Numeric => SqlType::Numeric(crate::sql_types::Numeric {
+            ColumnType::Numeric => ColumnValue::Numeric(crate::sql_types::Numeric {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Decimal => SqlType::Decimal(crate::sql_types::Decimal {
+            ColumnType::Decimal => ColumnValue::Decimal(crate::sql_types::Decimal {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Text => SqlType::Text(crate::sql_types::Text {
+            ColumnType::Text => ColumnValue::Text(crate::sql_types::Text {
                 inner: value.clone(),
             }),
-            SqlTypeMap::VarChar => SqlType::VarChar(crate::sql_types::VarChar {
+            ColumnType::VarChar => ColumnValue::VarChar(crate::sql_types::VarChar {
                 inner: value.clone(),
             }),
-            SqlTypeMap::Char => SqlType::Char(crate::sql_types::Char {
+            ColumnType::Char => ColumnValue::Char(crate::sql_types::Char {
                 inner: value.clone(),
             }),
-            SqlTypeMap::TinyText => SqlType::TinyText(crate::sql_types::TinyText {
+            ColumnType::TinyText => ColumnValue::TinyText(crate::sql_types::TinyText {
                 inner: value.clone(),
             }),
-            SqlTypeMap::MediumText => SqlType::MediumText(crate::sql_types::MediumText {
+            ColumnType::MediumText => ColumnValue::MediumText(crate::sql_types::MediumText {
                 inner: value.clone(),
             }),
-            SqlTypeMap::LongText => SqlType::LongText(crate::sql_types::LongText {
+            ColumnType::LongText => ColumnValue::LongText(crate::sql_types::LongText {
                 inner: value.clone(),
             }),
-            SqlTypeMap::Bit => SqlType::Bit(crate::sql_types::Bit {
+            ColumnType::Bit => ColumnValue::Bit(crate::sql_types::Bit {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::Binary => SqlType::Binary(crate::sql_types::Binary {
+            ColumnType::Binary => ColumnValue::Binary(crate::sql_types::Binary {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::Blob => SqlType::Blob(crate::sql_types::Blob {
+            ColumnType::Blob => ColumnValue::Blob(crate::sql_types::Blob {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::TinyBlob => SqlType::TinyBlob(crate::sql_types::TinyBlob {
+            ColumnType::TinyBlob => ColumnValue::TinyBlob(crate::sql_types::TinyBlob {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::MediumBlob => SqlType::MediumBlob(crate::sql_types::MediumBlob {
+            ColumnType::MediumBlob => ColumnValue::MediumBlob(crate::sql_types::MediumBlob {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::LongBlob => SqlType::LongBlob(crate::sql_types::LongBlob {
+            ColumnType::LongBlob => ColumnValue::LongBlob(crate::sql_types::LongBlob {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::Varbinary => SqlType::Varbinary(crate::sql_types::Varbinary {
+            ColumnType::Varbinary => ColumnValue::Varbinary(crate::sql_types::Varbinary {
                 inner: value.as_bytes().to_vec(),
             }),
-            SqlTypeMap::Date => SqlType::Date(crate::sql_types::Date {
+            ColumnType::Date => ColumnValue::Date(crate::sql_types::Date {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Time => SqlType::Time(crate::sql_types::Time {
+            ColumnType::Time => ColumnValue::Time(crate::sql_types::Time {
                 inner: value
                     .parse()
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Timestamp => SqlType::Timestamp(crate::sql_types::Timestamp {
+            ColumnType::Timestamp => ColumnValue::Timestamp(crate::sql_types::Timestamp {
                 inner: NaiveDateTime::parse_from_str(value.as_str(), "%Y-%m-%d %H:%M:%S")
                     .map_err(|_| DBError::FailedParseString(value.clone()))?,
             }),
-            SqlTypeMap::Interval => panic!("Not implemented!"),
+            ColumnType::Interval => panic!("Not implemented!"),
         })
     }
 }
 
-/// A native enumeration for diesel SQL types
 #[derive(Debug, Clone, PartialEq)]
-pub enum SqlTypeMap {
+/// A custom enumeration for diesel SQL types
+pub enum ColumnType {
     Bool,
     SmallInt,
     Int2,
@@ -446,7 +484,7 @@ pub enum SqlTypeMap {
     Timestamp,
 }
 
-impl TryFrom<&str> for SqlTypeMap {
+impl TryFrom<&str> for ColumnType {
     type Error = DBError;
 
     fn try_from(value: &str) -> Result<Self, DBError> {
@@ -497,120 +535,120 @@ mod tests {
 
     #[test]
     fn sql_type_to_string() {
-        let sql_bool = SqlType::Bool(Bool { inner: true });
+        let sql_bool = ColumnValue::Bool(Bool { inner: true });
         assert_eq!(sql_bool.to_string(), "true".to_string());
 
-        let sql_small_int = SqlType::SmallInt(SmallInt { inner: 1_u16 });
+        let sql_small_int = ColumnValue::SmallInt(SmallInt { inner: 1_u16 });
         assert_eq!(sql_small_int.to_string(), "1".to_string());
 
-        let sql_int2 = SqlType::Int2(Int2 { inner: 1_u16 });
+        let sql_int2 = ColumnValue::Int2(Int2 { inner: 1_u16 });
         assert_eq!(sql_int2.to_string(), "1".to_string());
 
-        let sql_integer = SqlType::Integer(Integer { inner: 1_u32 });
+        let sql_integer = ColumnValue::Integer(Integer { inner: 1_u32 });
         assert_eq!(sql_integer.to_string(), "1".to_string());
 
-        let sql_int4 = SqlType::Int4(Int4 { inner: 1_u32 });
+        let sql_int4 = ColumnValue::Int4(Int4 { inner: 1_u32 });
         assert_eq!(sql_int4.to_string(), "1".to_string());
 
-        let sql_big_int = SqlType::BigInt(BigInt { inner: 1_u64 });
+        let sql_big_int = ColumnValue::BigInt(BigInt { inner: 1_u64 });
         assert_eq!(sql_big_int.to_string(), "1".to_string());
 
-        let sql_int8 = SqlType::Int8(Int8 { inner: 1_u64 });
+        let sql_int8 = ColumnValue::Int8(Int8 { inner: 1_u64 });
         assert_eq!(sql_int8.to_string(), "1".to_string());
 
-        let sql_float = SqlType::Float(Float { inner: 1.2 });
+        let sql_float = ColumnValue::Float(Float { inner: 1.2 });
         assert_eq!(sql_float.to_string(), "1.2".to_string());
 
-        let sql_float4 = SqlType::Float4(Float { inner: 1.2 });
+        let sql_float4 = ColumnValue::Float4(Float { inner: 1.2 });
         assert_eq!(sql_float4.to_string(), "1.2".to_string());
 
-        let sql_double = SqlType::Double(Double { inner: 1.4 });
+        let sql_double = ColumnValue::Double(Double { inner: 1.4 });
         assert_eq!(sql_double.to_string(), "1.4".to_string());
 
-        let sql_float8 = SqlType::Float8(Float8 { inner: 1.4 });
+        let sql_float8 = ColumnValue::Float8(Float8 { inner: 1.4 });
         assert_eq!(sql_float8.to_string(), "1.4".to_string());
 
-        let sql_numeric = SqlType::Numeric(Numeric {
+        let sql_numeric = ColumnValue::Numeric(Numeric {
             inner: BigDecimal::from_str("3.1415").unwrap(),
         });
         assert_eq!(sql_numeric.to_string(), "3.1415".to_string());
 
-        let sql_decimal = SqlType::Decimal(Decimal {
+        let sql_decimal = ColumnValue::Decimal(Decimal {
             inner: BigDecimal::from_str("3.1415").unwrap(),
         });
         assert_eq!(sql_decimal.to_string(), "3.1415".to_string());
 
-        let sql_text = SqlType::Text(Text {
+        let sql_text = ColumnValue::Text(Text {
             inner: "a".to_string(),
         });
         assert_eq!(sql_text.to_string(), "'a'".to_string());
 
-        let sql_varchar = SqlType::VarChar(VarChar {
+        let sql_varchar = ColumnValue::VarChar(VarChar {
             inner: "a".to_string(),
         });
         assert_eq!(sql_varchar.to_string(), "'a'".to_string());
 
-        let sql_char = SqlType::Char(Char {
+        let sql_char = ColumnValue::Char(Char {
             inner: "a".to_string(),
         });
         assert_eq!(sql_char.to_string(), "'a'".to_string());
 
-        let sql_tiny_text = SqlType::TinyText(TinyText {
+        let sql_tiny_text = ColumnValue::TinyText(TinyText {
             inner: "a".to_string(),
         });
         assert_eq!(sql_tiny_text.to_string(), "'a'".to_string());
 
-        let sql_medium_text = SqlType::MediumText(MediumText {
+        let sql_medium_text = ColumnValue::MediumText(MediumText {
             inner: "a".to_string(),
         });
         assert_eq!(sql_medium_text.to_string(), "'a'".to_string());
 
-        let sql_long_text = SqlType::LongText(LongText {
+        let sql_long_text = ColumnValue::LongText(LongText {
             inner: "a".to_string(),
         });
         assert_eq!(sql_long_text.to_string(), "'a'".to_string());
 
-        let sql_binary = SqlType::Binary(Binary {
+        let sql_binary = ColumnValue::Binary(Binary {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_binary.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_tiny_blob = SqlType::TinyBlob(TinyBlob {
+        let sql_tiny_blob = ColumnValue::TinyBlob(TinyBlob {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_tiny_blob.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_blob = SqlType::Blob(Blob {
+        let sql_blob = ColumnValue::Blob(Blob {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_blob.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_medium_blob = SqlType::MediumBlob(MediumBlob {
+        let sql_medium_blob = ColumnValue::MediumBlob(MediumBlob {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_medium_blob.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_long_blob = SqlType::LongBlob(LongBlob {
+        let sql_long_blob = ColumnValue::LongBlob(LongBlob {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_long_blob.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_var_binary = SqlType::Varbinary(Varbinary {
+        let sql_var_binary = ColumnValue::Varbinary(Varbinary {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_var_binary.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_bit = SqlType::Bit(Bit {
+        let sql_bit = ColumnValue::Bit(Bit {
             inner: vec![0u8, 1, 2],
         });
         assert_eq!(sql_bit.to_string(), "[0, 1, 2]".to_string());
 
-        let sql_date = SqlType::Date(Date {
+        let sql_date = ColumnValue::Date(Date {
             inner: NaiveDate::from_ymd_opt(2023, 2, 22).unwrap(),
         });
         assert_eq!(sql_date.to_string(), "'2023-02-22'");
 
-        // let sql_interval = SqlType::Interval(Interval {
+        // let sql_interval = ColumnValue::Interval(Interval {
         //     pub inner: pg_interval::Interval::from_postgres("1 years 1 months 1 days 1 hours").unwrap(),
         // });
         // assert_eq!(
@@ -618,12 +656,12 @@ mod tests {
         //     "interval '1 years 1 months 1 days 1 hours'"
         // );
 
-        let sql_time = SqlType::Time(Time {
+        let sql_time = ColumnValue::Time(Time {
             inner: NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
         });
         assert_eq!(sql_time.to_string(), "'23:59:59'");
 
-        let sql_timestamp = SqlType::Timestamp(Timestamp {
+        let sql_timestamp = ColumnValue::Timestamp(Timestamp {
             inner: NaiveDate::from_ymd_opt(2016, 7, 8)
                 .unwrap()
                 .and_hms_opt(9, 10, 11)
@@ -634,80 +672,80 @@ mod tests {
 
     #[test]
     fn test_sql_type_map_from_string() {
-        assert_eq!(SqlTypeMap::try_from("bool").unwrap(), SqlTypeMap::Bool);
+        assert_eq!(ColumnType::try_from("bool").unwrap(), ColumnType::Bool);
         assert_eq!(
-            SqlTypeMap::try_from("smallint").unwrap(),
-            SqlTypeMap::SmallInt
+            ColumnType::try_from("smallint").unwrap(),
+            ColumnType::SmallInt
         );
-        assert_eq!(SqlTypeMap::try_from("int2").unwrap(), SqlTypeMap::Int2);
+        assert_eq!(ColumnType::try_from("int2").unwrap(), ColumnType::Int2);
         assert_eq!(
-            SqlTypeMap::try_from("integer").unwrap(),
-            SqlTypeMap::Integer
+            ColumnType::try_from("integer").unwrap(),
+            ColumnType::Integer
         );
-        assert_eq!(SqlTypeMap::try_from("int4").unwrap(), SqlTypeMap::Int4);
-        assert_eq!(SqlTypeMap::try_from("bigint").unwrap(), SqlTypeMap::BigInt);
-        assert_eq!(SqlTypeMap::try_from("int8").unwrap(), SqlTypeMap::Int8);
-        assert_eq!(SqlTypeMap::try_from("float").unwrap(), SqlTypeMap::Float);
-        assert_eq!(SqlTypeMap::try_from("float4").unwrap(), SqlTypeMap::Float4);
-        assert_eq!(SqlTypeMap::try_from("double").unwrap(), SqlTypeMap::Double);
-        assert_eq!(SqlTypeMap::try_from("float8").unwrap(), SqlTypeMap::Float8);
+        assert_eq!(ColumnType::try_from("int4").unwrap(), ColumnType::Int4);
+        assert_eq!(ColumnType::try_from("bigint").unwrap(), ColumnType::BigInt);
+        assert_eq!(ColumnType::try_from("int8").unwrap(), ColumnType::Int8);
+        assert_eq!(ColumnType::try_from("float").unwrap(), ColumnType::Float);
+        assert_eq!(ColumnType::try_from("float4").unwrap(), ColumnType::Float4);
+        assert_eq!(ColumnType::try_from("double").unwrap(), ColumnType::Double);
+        assert_eq!(ColumnType::try_from("float8").unwrap(), ColumnType::Float8);
         assert_eq!(
-            SqlTypeMap::try_from("numeric").unwrap(),
-            SqlTypeMap::Numeric
-        );
-        assert_eq!(
-            SqlTypeMap::try_from("decimal").unwrap(),
-            SqlTypeMap::Decimal
-        );
-        assert_eq!(SqlTypeMap::try_from("text").unwrap(), SqlTypeMap::Text);
-        assert_eq!(
-            SqlTypeMap::try_from("varchar").unwrap(),
-            SqlTypeMap::VarChar
-        );
-        assert_eq!(SqlTypeMap::try_from("char").unwrap(), SqlTypeMap::Char);
-        assert_eq!(
-            SqlTypeMap::try_from("decimal").unwrap(),
-            SqlTypeMap::Decimal
+            ColumnType::try_from("numeric").unwrap(),
+            ColumnType::Numeric
         );
         assert_eq!(
-            SqlTypeMap::try_from("tinytext").unwrap(),
-            SqlTypeMap::TinyText
+            ColumnType::try_from("decimal").unwrap(),
+            ColumnType::Decimal
+        );
+        assert_eq!(ColumnType::try_from("text").unwrap(), ColumnType::Text);
+        assert_eq!(
+            ColumnType::try_from("varchar").unwrap(),
+            ColumnType::VarChar
+        );
+        assert_eq!(ColumnType::try_from("char").unwrap(), ColumnType::Char);
+        assert_eq!(
+            ColumnType::try_from("decimal").unwrap(),
+            ColumnType::Decimal
         );
         assert_eq!(
-            SqlTypeMap::try_from("mediumtext").unwrap(),
-            SqlTypeMap::MediumText
+            ColumnType::try_from("tinytext").unwrap(),
+            ColumnType::TinyText
         );
         assert_eq!(
-            SqlTypeMap::try_from("longtext").unwrap(),
-            SqlTypeMap::LongText
-        );
-        assert_eq!(SqlTypeMap::try_from("binary").unwrap(), SqlTypeMap::Binary);
-        assert_eq!(
-            SqlTypeMap::try_from("tinyblob").unwrap(),
-            SqlTypeMap::TinyBlob
+            ColumnType::try_from("mediumtext").unwrap(),
+            ColumnType::MediumText
         );
         assert_eq!(
-            SqlTypeMap::try_from("mediumblob").unwrap(),
-            SqlTypeMap::MediumBlob
+            ColumnType::try_from("longtext").unwrap(),
+            ColumnType::LongText
+        );
+        assert_eq!(ColumnType::try_from("binary").unwrap(), ColumnType::Binary);
+        assert_eq!(
+            ColumnType::try_from("tinyblob").unwrap(),
+            ColumnType::TinyBlob
         );
         assert_eq!(
-            SqlTypeMap::try_from("longblob").unwrap(),
-            SqlTypeMap::LongBlob
+            ColumnType::try_from("mediumblob").unwrap(),
+            ColumnType::MediumBlob
         );
         assert_eq!(
-            SqlTypeMap::try_from("varbinary").unwrap(),
-            SqlTypeMap::Varbinary
+            ColumnType::try_from("longblob").unwrap(),
+            ColumnType::LongBlob
         );
-        assert_eq!(SqlTypeMap::try_from("bit").unwrap(), SqlTypeMap::Bit);
-        assert_eq!(SqlTypeMap::try_from("date").unwrap(), SqlTypeMap::Date);
         assert_eq!(
-            SqlTypeMap::try_from("interval").unwrap(),
-            SqlTypeMap::Interval
+            ColumnType::try_from("varbinary").unwrap(),
+            ColumnType::Varbinary
         );
-        assert_eq!(SqlTypeMap::try_from("time").unwrap(), SqlTypeMap::Time);
+        assert_eq!(ColumnType::try_from("bit").unwrap(), ColumnType::Bit);
+        assert_eq!(ColumnType::try_from("date").unwrap(), ColumnType::Date);
         assert_eq!(
-            SqlTypeMap::try_from("timestamp").unwrap(),
-            SqlTypeMap::Timestamp
+            ColumnType::try_from("interval").unwrap(),
+            ColumnType::Interval
+        );
+        assert_eq!(ColumnType::try_from("time").unwrap(), ColumnType::Time);
+        assert_eq!(
+            ColumnType::try_from("timestamp").unwrap(),
+            ColumnType::Timestamp
         );
     }
 
@@ -715,128 +753,128 @@ mod tests {
     fn it_works_parse_sql_types() {
         let x = "10".to_string();
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::SmallInt, x.clone()).unwrap(),
-            SqlType::SmallInt(SmallInt { inner: 10 })
+            ColumnValue::parse_type(ColumnType::SmallInt, x.clone()).unwrap(),
+            ColumnValue::SmallInt(SmallInt { inner: 10 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Int2, x.clone()).unwrap(),
-            SqlType::Int2(Int2 { inner: 10 })
+            ColumnValue::parse_type(ColumnType::Int2, x.clone()).unwrap(),
+            ColumnValue::Int2(Int2 { inner: 10 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Int4, x.clone()).unwrap(),
-            SqlType::Int4(Int4 { inner: 10 })
+            ColumnValue::parse_type(ColumnType::Int4, x.clone()).unwrap(),
+            ColumnValue::Int4(Int4 { inner: 10 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Int8, x.clone()).unwrap(),
-            SqlType::Int8(Int8 { inner: 10 })
+            ColumnValue::parse_type(ColumnType::Int8, x.clone()).unwrap(),
+            ColumnValue::Int8(Int8 { inner: 10 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Integer, x.clone()).unwrap(),
-            SqlType::Integer(Integer { inner: 10 })
+            ColumnValue::parse_type(ColumnType::Integer, x.clone()).unwrap(),
+            ColumnValue::Integer(Integer { inner: 10 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::BigInt, x.clone()).unwrap(),
-            SqlType::BigInt(BigInt { inner: 10 })
+            ColumnValue::parse_type(ColumnType::BigInt, x.clone()).unwrap(),
+            ColumnValue::BigInt(BigInt { inner: 10 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::SmallInt, x.clone()).unwrap(),
-            SqlType::SmallInt(SmallInt { inner: 10 })
+            ColumnValue::parse_type(ColumnType::SmallInt, x.clone()).unwrap(),
+            ColumnValue::SmallInt(SmallInt { inner: 10 })
         );
 
         let x = "3.3152345".to_string();
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Float, x.clone()).unwrap(),
-            SqlType::Float(Float { inner: 3.3152345 })
+            ColumnValue::parse_type(ColumnType::Float, x.clone()).unwrap(),
+            ColumnValue::Float(Float { inner: 3.3152345 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Float4, x.clone()).unwrap(),
-            SqlType::Float4(Float4 { inner: 3.3152345 })
+            ColumnValue::parse_type(ColumnType::Float4, x.clone()).unwrap(),
+            ColumnValue::Float4(Float4 { inner: 3.3152345 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Float8, x.clone()).unwrap(),
-            SqlType::Float8(Float8 { inner: 3.3152345 })
+            ColumnValue::parse_type(ColumnType::Float8, x.clone()).unwrap(),
+            ColumnValue::Float8(Float8 { inner: 3.3152345 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Double, x.clone()).unwrap(),
-            SqlType::Double(Double { inner: 3.3152345 })
+            ColumnValue::parse_type(ColumnType::Double, x.clone()).unwrap(),
+            ColumnValue::Double(Double { inner: 3.3152345 })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Numeric, x.clone()).unwrap(),
-            SqlType::Numeric(Numeric {
+            ColumnValue::parse_type(ColumnType::Numeric, x.clone()).unwrap(),
+            ColumnValue::Numeric(Numeric {
                 inner: BigDecimal::from_str("3.3152345").unwrap()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Decimal, x.clone()).unwrap(),
-            SqlType::Decimal(Decimal {
+            ColumnValue::parse_type(ColumnType::Decimal, x.clone()).unwrap(),
+            ColumnValue::Decimal(Decimal {
                 inner: BigDecimal::from_str("3.3152345").unwrap()
             })
         );
 
         let x = "dasdjofdafsd".to_string();
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Text, x.clone()).unwrap(),
-            SqlType::Text(Text {
+            ColumnValue::parse_type(ColumnType::Text, x.clone()).unwrap(),
+            ColumnValue::Text(Text {
                 inner: "dasdjofdafsd".to_string()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::VarChar, x.clone()).unwrap(),
-            SqlType::VarChar(VarChar {
+            ColumnValue::parse_type(ColumnType::VarChar, x.clone()).unwrap(),
+            ColumnValue::VarChar(VarChar {
                 inner: "dasdjofdafsd".to_string()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Char, x.clone()).unwrap(),
-            SqlType::Char(Char {
+            ColumnValue::parse_type(ColumnType::Char, x.clone()).unwrap(),
+            ColumnValue::Char(Char {
                 inner: "dasdjofdafsd".to_string()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::VarChar, x.clone()).unwrap(),
-            SqlType::VarChar(VarChar {
+            ColumnValue::parse_type(ColumnType::VarChar, x.clone()).unwrap(),
+            ColumnValue::VarChar(VarChar {
                 inner: "dasdjofdafsd".to_string()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::TinyText, x.clone()).unwrap(),
-            SqlType::TinyText(TinyText {
+            ColumnValue::parse_type(ColumnType::TinyText, x.clone()).unwrap(),
+            ColumnValue::TinyText(TinyText {
                 inner: "dasdjofdafsd".to_string()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::MediumText, x.clone()).unwrap(),
-            SqlType::MediumText(MediumText {
+            ColumnValue::parse_type(ColumnType::MediumText, x.clone()).unwrap(),
+            ColumnValue::MediumText(MediumText {
                 inner: "dasdjofdafsd".to_string()
             })
         );
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::LongText, x.clone()).unwrap(),
-            SqlType::LongText(LongText {
+            ColumnValue::parse_type(ColumnType::LongText, x.clone()).unwrap(),
+            ColumnValue::LongText(LongText {
                 inner: "dasdjofdafsd".to_string()
             })
         );
 
         let x = "2023-01-01".to_string();
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Date, x).unwrap(),
-            SqlType::Date(Date {
+            ColumnValue::parse_type(ColumnType::Date, x).unwrap(),
+            ColumnValue::Date(Date {
                 inner: NaiveDate::from_str("2023-01-01").unwrap()
             })
         );
 
         let x = "23:59:59".to_string();
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Time, x).unwrap(),
-            SqlType::Time(Time {
+            ColumnValue::parse_type(ColumnType::Time, x).unwrap(),
+            ColumnValue::Time(Time {
                 inner: NaiveTime::from_str("23:59:59").unwrap()
             })
         );
 
         let x = "2023-01-01 23:59:59".to_string();
         assert_eq!(
-            SqlType::parse_type(SqlTypeMap::Timestamp, x).unwrap(),
-            SqlType::Timestamp(Timestamp {
+            ColumnValue::parse_type(ColumnType::Timestamp, x).unwrap(),
+            ColumnValue::Timestamp(Timestamp {
                 inner: NaiveDateTime::parse_from_str("2023-01-01 23:59:59", "%Y-%m-%d %H:%M:%S")
                     .unwrap()
             })

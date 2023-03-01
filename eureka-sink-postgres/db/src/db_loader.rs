@@ -1,5 +1,5 @@
 use crate::operation::Operation;
-use crate::{error::DBError, sql_types::SqlTypeMap};
+use crate::{error::DBError, sql_types::ColumnType};
 use diesel::{sql_query, Connection, PgConnection, QueryableByName, RunQueryDsl};
 use std::{
     collections::{HashMap, HashSet},
@@ -8,35 +8,31 @@ use std::{
 };
 
 #[allow(dead_code)]
-pub struct Loader {
+/// [`DBLoader`] provides an interface to deal with a PostgreSQL database, which is
+/// suitable to be used as a sink to Substreams data (https://substreams.streamingfast.io/developers-guide/sink-targets).
+/// It provides functionality to deal with generic tables as well as a `cursors` table
+/// (https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-postgres#cursors).
+pub struct DBLoader {
+    /// A PostgresSQL connection do a DB.
     connection: PgConnection,
+    /// Database name
     database: String,
+    /// Current schema, in which tables exists.
     schema: String,
+    /// Mapping from table name to column name to operation.
     entries: HashMap<String, HashMap<String, Operation>>,
+    /// number of entries, i.e., total size of `entries` above.
     entries_count: u64,
-    tables: HashMap<String, HashMap<String, SqlTypeMap>>,
+    /// Table metadata, in the form of a mapping from table name
+    /// to column field to its underlying type.
+    tables: HashMap<String, HashMap<String, ColumnType>>,
+    /// For each table_name we provide an array of its primary key column names.
     table_primary_keys: HashMap<String, String>,
 }
 
-#[derive(QueryableByName, Debug)]
 #[allow(dead_code)]
-pub struct RawQueryTableNames {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    table_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    column_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    column_type: String,
-}
-
-#[allow(dead_code)]
-impl Loader {
-    // TODO: set interface for extracting these values from environment variables
+impl DBLoader {
     pub fn new(dsn_string: String, schema_namespace: String) -> Result<Self, DBError> {
-        // TODO: do we need to create directory ?
-        // create_dir_all(path.parent().unwrap())
-        //     .map_err(|_| DBError::FileSystemPathDoesNotExist)?;
-
         let database = dsn::parse(dsn_string.as_str())
             .map_err(|e| DBError::InvalidDSNParsing(e))?
             .database
@@ -55,12 +51,14 @@ impl Loader {
         })
     }
 
+    /// Resets all entries count to 0.
     pub fn reset_entries_count(&mut self) -> u64 {
         let entries_count = self.entries_count;
         self.entries_count = 0;
         entries_count
     }
 
+    /// Loads all necessary tables that exist for the current schema and DB.
     pub fn load_tables(&mut self) -> Result<(), DBError> {
         #[derive(QueryableByName)]
         pub struct TableMetadata {
@@ -101,7 +99,7 @@ impl Loader {
                     if q.table_name == table {
                         Some((
                             q.column_name.clone(),
-                            SqlTypeMap::try_from(q.column_type.as_str())
+                            ColumnType::try_from(q.column_type.as_str())
                                 .expect("Invalid field type"),
                         ))
                     } else {
@@ -117,38 +115,36 @@ impl Loader {
             // update tables mapping
             self.tables.insert(table.clone(), cols);
 
-            let primary_keys = self.get_primary_key_from_table(table.as_str())?;
-            let primary_keys = primary_keys
-                .iter()
-                .map(|pk| pk.clone())
-                .collect::<Vec<String>>();
+            let primary_key = self.get_primary_key_from_table(table.as_str())?;
+
             // TODO: for now we only insert the first primary key column,
             // following the Golang repo. Should we instead be more general ?
-            self.table_primary_keys
-                .insert(table, primary_keys[0].clone());
+            self.table_primary_keys.insert(table, primary_key);
         }
 
         Ok(())
     }
 
+    /// Validates the `cursors` table. This is important, as this table
+    /// follows a very speficic format `(block_num, block_id, cursor, id)`.
     pub fn validate_cursor_table(
         &mut self,
-        columns: HashMap<String, SqlTypeMap>,
+        columns: HashMap<String, ColumnType>,
     ) -> Result<(), DBError> {
         Self::validate_cursor_table_columns(columns)?;
 
         // check if primary key has correct name, and thus type
-        let pks = self.get_primary_key_from_table("cursors")?;
-        let pk = pks[0].as_str();
+        let pk = self.get_primary_key_from_table("cursors")?;
 
-        if pk != "id" {
+        if pk.as_str() != "id" {
             return Err(DBError::InvalidCursorColumnType);
         }
 
         Ok(())
     }
 
-    fn validate_cursor_table_columns(columns: HashMap<String, SqlTypeMap>) -> Result<(), DBError> {
+    /// Auxiliary function used in [`validate_cursor_table`].
+    fn validate_cursor_table_columns(columns: HashMap<String, ColumnType>) -> Result<(), DBError> {
         if columns.len() != 4 {
             return Err(DBError::InvalidCursorColumns);
         }
@@ -169,17 +165,12 @@ impl Loader {
             }
 
             match col {
-                SqlTypeMap::BigInt | SqlTypeMap::Int8 => {
+                ColumnType::BigInt => {
                     if col_name != "block_num" {
                         return Err(DBError::InvalidCursorColumnType);
                     }
                 }
-                SqlTypeMap::Text
-                | SqlTypeMap::VarChar
-                | SqlTypeMap::Char
-                | SqlTypeMap::TinyText
-                | SqlTypeMap::MediumText
-                | SqlTypeMap::LongText => {
+                ColumnType::Text => {
                     if col_name == "block_num" {
                         return Err(DBError::InvalidCursorColumnType);
                     }
@@ -191,10 +182,12 @@ impl Loader {
         Ok(())
     }
 
+    /// Gets database schema identifier, in the form db.schema.
     pub fn get_identifier(&self) -> String {
         format!("{}/{}", self.database, self.schema)
     }
 
+    /// Get all table names in our schema.
     pub fn get_available_tables_in_schema(&self) -> Vec<String> {
         self.table_primary_keys
             .iter()
@@ -210,7 +203,7 @@ impl Loader {
         self.table_primary_keys.get(table_name).cloned()
     }
 
-    pub fn get_tables(&self) -> &HashMap<String, HashMap<String, SqlTypeMap>> {
+    pub fn get_tables(&self) -> &HashMap<String, HashMap<String, ColumnType>> {
         &self.tables
     }
 
@@ -226,12 +219,15 @@ impl Loader {
         &self.entries
     }
 
+    /// It increases by 1 the `entries_count` value. To be used, whenever
+    /// a new entrie is inserted in [`tables`].
     pub(crate) fn increase_entries_count(&mut self) -> u64 {
         let entries_count = self.entries_count;
         self.entries_count += 1;
         entries_count
     }
 
+    /// Checks if `table` exists in the current db and schema state.
     pub fn has_table(&self, table: &String) -> bool {
         self.tables.get(table).is_some()
     }
@@ -265,6 +261,9 @@ impl Loader {
         &mut self.entries
     }
 
+    /// Given a a file path, assumed to be of .sql extension, it executes all queries
+    /// in that file. The goal is to create, if necessary, all necessary tables in the
+    /// schema. It also sets up a [`cursors`] table.
     pub fn setup_schema(&mut self, setup_file: PathBuf) -> Result<usize, DBError> {
         let setup_query =
             std::fs::read_to_string(setup_file).map_err(|e| DBError::InvalidSchemaPath(e))?;
@@ -276,9 +275,10 @@ impl Loader {
         Ok(count)
     }
 
-    fn get_primary_key_from_table(&mut self, table: &str) -> Result<Vec<String>, DBError> {
+    /// Given a table name, it outputs its primary key column name
+    fn get_primary_key_from_table(&mut self, table: &str) -> Result<String, DBError> {
+        // auxiliary type to be used as the output of executing query
         #[derive(QueryableByName)]
-        // TODO: add docs
         pub struct PrimaryKey {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pk: String,
@@ -295,12 +295,19 @@ impl Loader {
         "
         );
 
-        let result = sql_query(query)
+        let primary_keys = sql_query(query)
             .bind::<diesel::sql_types::Text, _>(self.schema.clone())
             .bind::<diesel::sql_types::Text, _>(table)
             .load::<PrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
-        Ok(result.iter().map(|q| q.pk.clone()).collect::<Vec<String>>())
+
+        // For now we assume our tables only have one primary key column
+        let primary_key = primary_keys.first().ok_or(DBError::EmptyQuery(format!(
+            "Unable to query the primary key for table {}",
+            table
+        )))?;
+
+        Ok(primary_key.pk.clone())
     }
 }
 
@@ -311,11 +318,11 @@ mod tests {
     #[test]
     fn it_works_validate_cursor_tables() {
         let columns = HashMap::from([
-            ("block_num".to_string(), SqlTypeMap::BigInt),
-            ("block_id".to_string(), SqlTypeMap::Text),
-            ("cursor".to_string(), SqlTypeMap::Text),
-            ("id".to_string(), SqlTypeMap::Text),
+            ("block_num".to_string(), ColumnType::BigInt),
+            ("block_id".to_string(), ColumnType::Text),
+            ("cursor".to_string(), ColumnType::Text),
+            ("id".to_string(), ColumnType::Text),
         ]);
-        assert!(Loader::validate_cursor_table_columns(columns).is_ok());
+        assert!(DBLoader::validate_cursor_table_columns(columns).is_ok());
     }
 }

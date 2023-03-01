@@ -1,14 +1,15 @@
 use diesel::{sql_query, RunQueryDsl};
 use substreams_sink::Cursor;
 
-use crate::{cursor::CursorLoader, db_loader::Loader, error::DBError};
+use crate::{cursor::CursorLoader, db_loader::DBLoader, error::DBError};
 
+/// Interface to flush changes to a [`DBLoader`] instance.
 pub trait FlushLoader {
     fn flush(&mut self, output_module_hash: String, cursor: Cursor) -> Result<(), DBError>;
 }
 
 #[allow(dead_code)]
-impl FlushLoader for Loader {
+impl FlushLoader for DBLoader {
     fn flush(&mut self, output_module_hash: String, cursor: Cursor) -> Result<(), DBError> {
         let entries = self.entries().clone();
         let schema = self.get_schema().clone();
@@ -44,7 +45,8 @@ impl FlushLoader for Loader {
     }
 }
 
-impl Loader {
+impl DBLoader {
+    /// Resets [`DBLoader`] instance state.
     fn reset(&mut self) -> Result<(), DBError> {
         self.entries_mut().iter_mut().for_each(|(_, hm)| hm.clear());
         self.reset_entries_count();
