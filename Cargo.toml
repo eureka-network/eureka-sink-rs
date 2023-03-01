@@ -1,10 +1,9 @@
 [workspace]
 members = [
+    "bin/node/cli",
     "eureka-sink-postgres/db",
     "substreams-sink",
-    "substreams/eth-block-header",
-    "substreams/eth-balance"
-    ]
+]
 
 [profile.release]
 opt-level = 2

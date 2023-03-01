@@ -8,5 +8,7 @@ description = "Substreams Postgres synchronization"
 bigdecimal = "0.3.0"
 chrono = "0.4.23"
 diesel = { version = "2.0.3", features = ["postgres"] }
+dsn = "1.0.2"
 pg_interval = "0.4.2"
 thiserror = "1.0.38"
+substreams-sink = { path = "../../substreams-sink" }
