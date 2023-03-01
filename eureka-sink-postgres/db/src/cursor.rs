@@ -41,10 +41,13 @@ impl CursorLoader for Loader {
             return Err(DBError::EmptyQuery(output_module_hash));
         }
 
-        // We already checked that the query is not empty, as this point. Moreover,
-        // we are selecting on the primary key, which we know defines a unique mapping
-        // key -> valuue, so the cursor_rows.len() == 1
-        let cursor_row = cursor_rows[0].clone();
+        // At this point, we already checked that the query is not empty. Moreover,
+        // selecting on the primary key, defines a unique mapping,
+        // therefore cursor_rows.len() == 1
+        let cursor_row = cursor_rows
+            .first()
+            .ok_or(DBError::EmptyQuery(output_module_hash))?
+            .clone();
 
         Ok(Cursor {
             cursor: cursor_row.cursor,
