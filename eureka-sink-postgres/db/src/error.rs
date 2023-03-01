@@ -29,4 +29,21 @@ pub enum DBError {
     ColumnNotFound(String),
     #[error("Failed to parse value {0}")]
     FailedParseString(String),
+    #[error("Failed to execute query: {query} with error: {error}")]
+    FailedToExecuteQuery { query: String, error: String },
+    #[error("Empty query for param: {0}")]
+    EmptyQuery(String),
+    #[error("Invalid column data type: {0}")]
+    InvalidColumnDataType(String),
 }
+
+// impl From<DBError> for diesel::result::Error {
+//     fn from(e: DBError) -> Self {
+//         match e {
+//             DBError::FailedToExecuteQuery { query, error } => {
+//                 Self::QueryBuilderError(Box::new(format!("query = {}, error = {}", query, error)))
+//             }
+//             _ => Self::QueryBuilderError(Box::new("Failed with diesel error")),
+//         }
+//     }
+// }

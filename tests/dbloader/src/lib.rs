@@ -1,8 +1,11 @@
 use serial_test::serial;
 use std::{collections::HashMap, path::PathBuf};
+use substreams_sink::{BlockRef, Cursor};
 
 use eureka_sink_postgres::{
+    cursor::CursorLoader,
     db_loader::Loader,
+    flush::FlushLoader,
     operation::{Operation, OperationType},
     sql_types::{SqlType, SqlTypeMap, Text},
 };
@@ -205,4 +208,139 @@ fn it_works_insert_operations() {
     .collect::<HashMap<String, String>>();
 
     assert!(loader.insert(table_name, primary_key, data).is_err());
+}
+
+#[test]
+#[serial]
+fn it_works_cursor_operations() {
+    let database_url = DATABASE_URL.to_string();
+    let schema_namespace = String::from("public");
+    let mut loader = Loader::new(database_url, schema_namespace).unwrap();
+
+    // TODO: after moving this repo to eureka-sink-postgres, uncomment this code
+    // // clean previous database instances
+    // let clean_file = PathBuf::try_from("../../tests/dbloader/sql/schema.sql").unwrap();
+    // let clean_query = std::fs::read_to_string(clean_file).unwrap();
+
+    // sql_query(clean_query)
+    //     .execute(loader.connection().unwrap().deref_mut())
+    //     .unwrap();
+
+    let schema_file = PathBuf::try_from("../../tests/dbloader/sql/schema.sql").unwrap();
+    loader.setup_schema(schema_file).unwrap();
+
+    loader.load_tables().unwrap();
+
+    let module_hash = "0x1".to_string();
+    let cursor = Cursor {
+        cursor: String::from("cursor1"),
+        block: BlockRef {
+            num: 0,
+            id: String::from("id1"),
+        },
+    };
+
+    // insert into the cursor table
+    loader
+        .write_cursor(module_hash.clone(), cursor.clone())
+        .unwrap();
+
+    // get cursor data
+    let test_cursor = loader.get_cursor(module_hash.clone()).unwrap();
+    assert_eq!(test_cursor, cursor);
+
+    // now we update the cursors table
+    let new_cursor = Cursor {
+        cursor: String::from("cursor12"),
+        block: BlockRef {
+            num: 1,
+            id: String::from("id2"),
+        },
+    };
+    loader
+        .update_cursor_query(module_hash.clone(), new_cursor.clone())
+        .unwrap();
+
+    // get cursor data
+    let test_cursor = loader.get_cursor(module_hash).unwrap();
+    assert_eq!(test_cursor, new_cursor);
+}
+
+#[test]
+#[serial]
+fn it_works_flush() {
+    let database_url = DATABASE_URL.to_string();
+    let schema_namespace = String::from("public");
+    let mut loader = Loader::new(database_url, schema_namespace).unwrap();
+
+    let schema_file = PathBuf::try_from("../../tests/dbloader/sql/schema.sql").unwrap();
+    loader.setup_schema(schema_file).unwrap();
+
+    loader.load_tables().unwrap();
+
+    let table_name = String::from("block_meta");
+    let primary_key = String::from("pk1");
+    let data = [
+        ("parent_hash", "0x0"),
+        ("timestamp", "2023-01-01"),
+        ("at", "block1"),
+        ("hash", "0x1"),
+        ("number", "0"),
+        ("id", "1"),
+    ]
+    .iter()
+    .map(|(s, t)| (String::from(*s), String::from(*t)))
+    .collect::<HashMap<String, String>>();
+
+    // insert first operation data
+    loader
+        .insert(table_name.clone(), primary_key, data.clone())
+        .unwrap();
+
+    let primary_key = String::from("pk2");
+    let data = [
+        ("parent_hash", "0x1"),
+        ("timestamp", "2023-01-01"),
+        ("at", "block2"),
+        ("hash", "0x2"),
+        ("number", "1"),
+        ("id", "2"),
+    ]
+    .iter()
+    .map(|(s, t)| (String::from(*s), String::from(*t)))
+    .collect::<HashMap<String, String>>();
+
+    // insert second operation data
+    loader
+        .insert(table_name.clone(), primary_key.clone(), data.clone())
+        .unwrap();
+
+    // TODO: after moving this repo to eureka-sink-postgres, uncomment this code
+    // // now insert values in the cursor table
+    // let module_hash = "0x1".to_string();
+    // let cursor = Cursor {
+    //     cursor: String::from("cursor1"),
+    //     block: BlockRef {
+    //         num: 0,
+    //         id: String::from("id1"),
+    //     },
+    // };
+
+    // // insert into the cursor table
+    // loader
+    //     .write_cursor(module_hash.clone(), cursor.clone())
+    //     .unwrap();
+
+    let module_hash = "0x1".to_string();
+    let cursor = Cursor {
+        cursor: String::from("cursor3"),
+        block: BlockRef {
+            num: 2,
+            id: String::from("id3"),
+        },
+    };
+    assert!(loader.flush(module_hash.clone(), cursor.clone()).is_ok());
+    // TODO: uncomment this code after moving current repo to eureka-sink-postgres
+    // let test_cursor = loader.get_cursor(module_hash).unwrap();
+    // assert_eq!(cursor, test_cursor);
 }

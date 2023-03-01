@@ -4,7 +4,7 @@ pub mod pb {
 use pb::{stream_client::StreamClient, Request, Response};
 use tonic::{codegen::*, Status};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BlockRef {
     pub id: String,
     pub num: u64,
@@ -15,7 +15,7 @@ impl BlockRef {
         Self { id, num }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Cursor {
     pub cursor: String,
     pub block: BlockRef,

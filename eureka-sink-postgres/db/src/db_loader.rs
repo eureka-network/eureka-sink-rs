@@ -54,7 +54,7 @@ impl Loader {
             .map_err(|e| DBError::ConnectionError(e))?;
 
         Ok(Self {
-            connection,
+            connection: connection,
             database,
             schema: schema_namespace,
             entries: HashMap::new(),
@@ -62,6 +62,12 @@ impl Loader {
             tables: HashMap::new(),
             table_primary_keys: HashMap::new(),
         })
+    }
+
+    pub fn reset_entries_count(&mut self) -> u64 {
+        let entries_count = self.entries_count;
+        self.entries_count = 0;
+        entries_count
     }
 
     pub fn load_tables(&mut self) -> Result<(), DBError> {
@@ -244,8 +250,16 @@ impl Loader {
         Ok(())
     }
 
-    fn connection(&mut self) -> &mut PgConnection {
+    pub(crate) fn connection(&mut self) -> &mut PgConnection {
         &mut self.connection
+    }
+
+    pub(crate) fn entries(&self) -> &HashMap<String, HashMap<String, Operation>> {
+        &self.entries
+    }
+
+    pub(crate) fn entries_mut(&mut self) -> &mut HashMap<String, HashMap<String, Operation>> {
+        &mut self.entries
     }
 
     pub fn setup_schema(&mut self, setup_file: PathBuf) -> Result<usize, DBError> {

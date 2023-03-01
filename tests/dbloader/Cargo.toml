@@ -7,5 +7,6 @@ description = "postgres setup and loading tests"
 [dependencies]
 eureka-sink-postgres = { path = "../../eureka-sink-postgres/db/"}
 serial_test = "1.0.0"
+substreams-sink = { path = "../../substreams-sink" }
 
 [workspace]
