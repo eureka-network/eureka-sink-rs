@@ -90,7 +90,7 @@ async fn main() {
                 for output in data.outputs {
                     match output.data.unwrap() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
-                            let ops: ingest::IngestOperations = decode(&d.value).unwrap();
+                            let ops: ingest::RecordChanges = decode(&d.value).unwrap();
                             println!("{}\n{:?}", d.type_url, ops);
                         }
                         _ => {}

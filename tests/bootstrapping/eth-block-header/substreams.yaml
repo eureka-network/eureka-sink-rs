@@ -23,4 +23,4 @@ modules:
       inputs:
           - source: sf.ethereum.type.v2.Block
       output:
-          type: proto:sepana.ingest.v1.IngestOperations
+          type: proto:sepana.ingest.v1.RecordChanges
