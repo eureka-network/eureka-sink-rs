@@ -220,7 +220,7 @@ impl DBLoader {
     }
 
     /// It increases by 1 the `entries_count` value. To be used, whenever
-    /// a new entrie is inserted in [`tables`].
+    /// a new entry is inserted in [`tables`].
     pub(crate) fn increase_entries_count(&mut self) -> u64 {
         let entries_count = self.entries_count;
         self.entries_count += 1;

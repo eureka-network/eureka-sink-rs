@@ -7,10 +7,44 @@ use crate::{
     sql_types::ColumnValue,
 };
 
+/// [`DBLoaderOperations`] introduces an interface to apply operations/changes
+/// to a DB, via a [`DBLoader`] instance.
+pub trait DBLoaderOperations {
+    /// Inserts a new [`Delete`] operation in the [`DBLoader`]
+    fn delete(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
+    /// Inserts a new [`Insert`] operation in the [`DBLoader`]
+    fn insert(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
+    /// Inserts a new [`Update`] operation in the [`DBLoader`]
+    fn update(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
+}
+
 #[allow(dead_code)]
-impl DBLoader {
-    /// Inserts a new `Insert` operation on the [`DBLoader`].
-    pub fn insert(
+impl DBLoaderOperations for DBLoader {
+    fn delete(
+        &mut self,
+        _table_name: String,
+        _primary_key: String,
+        _data: HashMap<String, String>,
+    ) -> Result<(), DBError> {
+        unimplemented!("To be implemented!")
+    }
+
+    fn insert(
         &mut self,
         table_name: String,
         primary_key: String,
@@ -56,6 +90,15 @@ impl DBLoader {
         self.increase_entries_count();
 
         Ok(())
+    }
+
+    fn update(
+        &mut self,
+        _table_name: String,
+        _primary_key: String,
+        _data: HashMap<String, String>,
+    ) -> Result<(), DBError> {
+        unimplemented!("To be implemented!")
     }
 }
 
