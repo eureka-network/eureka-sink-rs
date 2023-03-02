@@ -1,16 +1,23 @@
 use diesel::{sql_query, PgConnection, QueryableByName, RunQueryDsl};
 use substreams_sink::{BlockRef, Cursor};
 
-use crate::{db_loader::Loader, error::DBError};
+use crate::{db_loader::DBLoader, error::DBError};
 
+/// Trait to apply changes to the cursors table directly
 pub trait CursorLoader {
+    /// Given the current state of the DB, gets the correct [`Cursor`] instance
+    /// for the given `id = output_module_hash`.
     fn get_cursor(&mut self, output_module_hash: String) -> Result<Cursor, DBError>;
+    /// Updates the current state of the `cursors` table, given an `output_module_hash`
+    /// value and a [`Cursor`] instance.
     fn update_cursor_query(
         schema: &String,
         module_hash: String,
         cursor: Cursor,
         conn: &mut PgConnection,
     ) -> Result<usize, DBError>;
+    /// Writes a new entry to the `cursors` table, given an `output_module_hash` value
+    /// and a [`Cursor`] instance.
     fn write_cursor(
         schema: &String,
         module_hash: String,
@@ -19,7 +26,7 @@ pub trait CursorLoader {
     ) -> Result<usize, DBError>;
 }
 
-impl CursorLoader for Loader {
+impl CursorLoader for DBLoader {
     fn get_cursor(&mut self, output_module_hash: String) -> Result<Cursor, DBError> {
         #[derive(QueryableByName, Clone)]
         struct CursorRow {

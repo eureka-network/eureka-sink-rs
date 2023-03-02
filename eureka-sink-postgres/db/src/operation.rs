@@ -1,8 +1,9 @@
-use crate::sql_types::SqlType;
+use crate::sql_types::ColumnValue;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
+/// Records the type of each of the available operations (insert, update, delete).
 pub enum OperationType {
     Insert,
     Update,
@@ -11,13 +12,22 @@ pub enum OperationType {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
+/// [`Operation`] provides interface to apply changes to the DB, via a [`DBLoader`]
+/// instance.
 pub struct Operation {
+    /// The schema name.
     schema_name: String,
+    /// The table name.
     table_name: String,
+    /// The primary key column name, for the current table.
     primary_key_column_name: String,
+    /// Checks which db operation is, either insert, update or delete.
     op_type: OperationType,
-    primary_key: SqlType,
-    data: HashMap<String, SqlType>, // mapping data row from columns -> field
+    /// Primary key value, with type already parsed in.
+    primary_key: ColumnValue,
+    /// The data to be applied on the operation. Consists of a mapping from
+    /// column name to its value, with type parsed in.
+    data: HashMap<String, ColumnValue>, // mapping data row from columns -> field
 }
 
 #[allow(dead_code)]
@@ -27,8 +37,8 @@ impl Operation {
         table_name: String,
         primary_key_column_name: String,
         op_type: OperationType,
-        primary_key: SqlType,
-        data: HashMap<String, SqlType>,
+        primary_key: ColumnValue,
+        data: HashMap<String, ColumnValue>,
     ) -> Self {
         Self {
             schema_name,
@@ -40,7 +50,8 @@ impl Operation {
         }
     }
 
-    // TODO: need to parse sql query in accordance with the data type
+    /// Builds a query to be executed by a [`DBLoader`] instance, which depends
+    /// on the operation type and the provided data, as well as the primary key value.
     pub fn build_query(&self) -> String {
         let query = match self.op_type {
             OperationType::Delete => {
@@ -56,14 +67,13 @@ impl Operation {
                 let mut keys = "".to_string();
                 let mut values = "".to_string();
 
-                // TODO: write this in a more idiomatic way
                 self.data.iter().for_each(|(k, v)| {
                     keys.push_str(format!(",{}", k).as_str());
                     values.push_str(format!(",{}", v.to_string()).as_str());
                 });
                 // remove extra initial ','
                 keys.remove(0); // ,col1,col2,col3,col4 -> col1,col2,col3,col4
-                values.remove(0); //
+                values.remove(0); // ,val1,val2,val3,val4 -> val1,val2,val3,val4
 
                 format!(
                     "INSERT INTO {}.{} ({}) VALUES ({})",
@@ -72,12 +82,12 @@ impl Operation {
             }
             OperationType::Update => {
                 let mut updates = "".to_string();
-                // TODO; write this more idiomatically
+
                 self.data.iter().for_each(|(k, v)| {
                     updates.push_str(format!(",{}={}", k, v.to_string()).as_str())
                 });
                 // remove extra initial ','
-                updates.remove(0);
+                updates.remove(0); //,col1=val1,col2=val2,col3=val3 -> col1=val1,col2=val2,col3=val3
                 format!(
                     "UPDATE {}.{} SET {} WHERE {}={}",
                     self.schema_name,
@@ -104,7 +114,7 @@ impl Operation {
         &self.primary_key_column_name
     }
 
-    pub fn primary_key(&self) -> &SqlType {
+    pub fn primary_key(&self) -> &ColumnValue {
         &self.primary_key
     }
 
@@ -112,7 +122,7 @@ impl Operation {
         &self.op_type
     }
 
-    pub fn data(&self) -> &HashMap<String, SqlType> {
+    pub fn data(&self) -> &HashMap<String, ColumnValue> {
         &self.data
     }
 }
@@ -121,7 +131,7 @@ impl Operation {
 mod tests {
     use chrono::NaiveDate;
 
-    use crate::sql_types::{Binary, Date, Integer, Text};
+    use crate::sql_types::{Binary, Date, Integer, Sql, Text};
 
     use super::*;
 
@@ -130,19 +140,17 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                SqlType::Integer(Integer { inner: 10_u32 }),
+                ColumnValue::Integer(Integer::set_inner(10)),
             ),
             (
                 "col2".to_string(),
-                SqlType::Date(Date {
-                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
-                }),
+                ColumnValue::Date(Date::set_inner(
+                    NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                )),
             ),
             (
                 "col3".to_string(),
-                SqlType::Binary(Binary {
-                    inner: vec![0u8, 1, 2],
-                }),
+                ColumnValue::Binary(Binary::set_inner(vec![0u8, 1, 2])),
             ),
         ]);
 
@@ -151,9 +159,7 @@ mod tests {
             "my_table".to_string(),
             "my_primary_key_column_name".to_string(),
             OperationType::Delete,
-            SqlType::Text(Text {
-                inner: "field_to_delete".to_string(),
-            }),
+            ColumnValue::Text(Text::set_inner("field_to_delete".to_string())),
             data,
         );
 
@@ -170,19 +176,17 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                SqlType::Integer(Integer { inner: 10_u32 }),
+                ColumnValue::Integer(Integer::set_inner(10)),
             ),
             (
                 "col2".to_string(),
-                SqlType::Date(Date {
-                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
-                }),
+                ColumnValue::Date(Date::set_inner(
+                    NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                )),
             ),
             (
                 "col3".to_string(),
-                SqlType::Binary(Binary {
-                    inner: vec![0u8, 1, 2],
-                }),
+                ColumnValue::Binary(Binary::set_inner(vec![0u8, 1, 2])),
             ),
         ]);
 
@@ -191,9 +195,7 @@ mod tests {
             "my_table".to_string(),
             "my_primary_key_column_name".to_string(),
             OperationType::Insert,
-            SqlType::Text(Text {
-                inner: "field_to_delete".to_string(),
-            }),
+            ColumnValue::Text(Text::set_inner("field_to_delete".to_string())),
             data,
         );
 
@@ -219,19 +221,17 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                SqlType::Integer(Integer { inner: 10_u32 }),
+                ColumnValue::Integer(Integer::set_inner(10_u32)),
             ),
             (
                 "col2".to_string(),
-                SqlType::Date(Date {
-                    inner: NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
-                }),
+                ColumnValue::Date(Date::set_inner(
+                    NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                )),
             ),
             (
                 "col3".to_string(),
-                SqlType::Binary(Binary {
-                    inner: vec![0u8, 1, 2],
-                }),
+                ColumnValue::Binary(Binary::set_inner(vec![0u8, 1, 2])),
             ),
         ]);
 
@@ -240,9 +240,7 @@ mod tests {
             "my_table".to_string(),
             "my_primary_key_column_name".to_string(),
             OperationType::Update,
-            SqlType::Text(Text {
-                inner: "field_to_delete".to_string(),
-            }),
+            ColumnValue::Text(Text::set_inner("field_to_delete".to_string())),
             data,
         );
 
