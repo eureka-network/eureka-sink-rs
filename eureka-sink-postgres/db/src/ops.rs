@@ -1,15 +1,50 @@
 use std::collections::HashMap;
 
 use crate::{
-    db_loader::Loader,
+    db_loader::DBLoader,
     error::DBError,
     operation::{Operation, OperationType},
-    sql_types::SqlType,
+    sql_types::ColumnValue,
 };
 
+/// [`DBLoaderOperations`] introduces an interface to apply operations/changes
+/// to a DB, via a [`DBLoader`] instance.
+pub trait DBLoaderOperations {
+    /// Inserts a new [`Delete`] operation in the [`DBLoader`]
+    fn delete(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
+    /// Inserts a new [`Insert`] operation in the [`DBLoader`]
+    fn insert(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
+    /// Inserts a new [`Update`] operation in the [`DBLoader`]
+    fn update(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
+}
+
 #[allow(dead_code)]
-impl Loader {
-    pub fn insert(
+impl DBLoaderOperations for DBLoader {
+    fn delete(
+        &mut self,
+        _table_name: String,
+        _primary_key: String,
+        _data: HashMap<String, String>,
+    ) -> Result<(), DBError> {
+        unimplemented!("To be implemented!")
+    }
+
+    fn insert(
         &mut self,
         table_name: String,
         primary_key: String,
@@ -31,7 +66,7 @@ impl Loader {
                         .expect("Invalid parsing of type"),
                 )
             })
-            .collect::<HashMap<String, SqlType>>();
+            .collect::<HashMap<String, ColumnValue>>();
         // retrieve insert operation
         let insert_op = self.new_insert_operation(table_name.clone(), primary_key_val, data);
 
@@ -56,15 +91,25 @@ impl Loader {
 
         Ok(())
     }
+
+    fn update(
+        &mut self,
+        _table_name: String,
+        _primary_key: String,
+        _data: HashMap<String, String>,
+    ) -> Result<(), DBError> {
+        unimplemented!("To be implemented!")
+    }
 }
 
-impl Loader {
+impl DBLoader {
+    /// Gets the the value of a column, with type already parsed in.
     fn get_type(
         &self,
         table_name: &String,
         column_name: &String,
         value: String,
-    ) -> Result<SqlType, DBError> {
+    ) -> Result<ColumnValue, DBError> {
         let table_cols = self
             .get_tables()
             .get(table_name)
@@ -74,14 +119,16 @@ impl Loader {
             .get(column_name)
             .ok_or(DBError::ColumnNotFound(column_name.clone()))?;
 
-        SqlType::parse_type(col_type.clone(), value)
+        ColumnValue::parse_type(col_type.clone(), value)
     }
 
+    /// Given a table name, a primary key and provided data, it creates a
+    /// new operation, of type `Insert`.
     fn new_insert_operation(
         &self,
         table_name: String,
-        primary_key: SqlType,
-        data: HashMap<String, SqlType>,
+        primary_key: ColumnValue,
+        data: HashMap<String, ColumnValue>,
     ) -> Operation {
         Operation::new(
             self.get_schema().clone(),
