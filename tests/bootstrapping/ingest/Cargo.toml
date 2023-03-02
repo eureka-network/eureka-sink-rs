@@ -1,0 +1,19 @@
+[package]
+name = "ingest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+clap-serde-derive = "0.2.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.7.2"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+substreams-sink = { path = "../../../substreams-sink" }
+prost = "0.11.6"
+
+[build-dependencies]
+tonic-build = "0.8.4"
+
+[workspace]
