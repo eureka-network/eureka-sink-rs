@@ -4,6 +4,9 @@ test-v0.1.0.spkg
 # development environment variables
 .env
 
+# imported proto files  
+/proto/import-*
+
 #rust
 Cargo.lock
 target
