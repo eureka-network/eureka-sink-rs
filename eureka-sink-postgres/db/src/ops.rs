@@ -7,21 +7,40 @@ use crate::{
     sql_types::ColumnValue,
 };
 
-
 /// [`DBLoaderOperations`] introduces an interface to apply operations/changes
 /// to a DB, via a [`DBLoader`] instance.
 pub trait DBLoaderOperations {
     /// Inserts a new [`Delete`] operation in the [`DBLoader`]
-    fn delete(&mut self, table_name: String, primary_key: String, data: HashMap<String, String>);
+    fn delete(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
     /// Inserts a new [`Insert`] operation in the [`DBLoader`]
-    fn insert(&mut self, table_name: String, primary_key: String, data: HashMap<String, String>);
+    fn insert(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
     /// Inserts a new [`Update`] operation in the [`DBLoader`]
-    fn update(&mut self, table_name: String, primary_key: String, data: HashMap<String, String>);
+    fn update(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError>;
 }
 
 #[allow(dead_code)]
 impl DBLoaderOperations for DBLoader {
-    pub fn delete(&mut self, table_name: String, primary_key: String, data: HashMap<String, String>) {
+    pub fn delete(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError> {
         unimplemented!("To be implemented!")
     }
 
@@ -73,7 +92,12 @@ impl DBLoaderOperations for DBLoader {
         Ok(())
     }
 
-    pub fn update(&mut self, table_name: String, primary_key: String, data: HashMap<String, String>) {
+    pub fn update(
+        &mut self,
+        table_name: String,
+        primary_key: String,
+        data: HashMap<String, String>,
+    ) -> Result<(), DBError> {
         unimplemented!("To be implemented!")
     }
 }
