@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
 use crate::{
-    db_loader::Loader,
+    db_loader::DBLoader,
     error::DBError,
     operation::{Operation, OperationType},
-    sql_types::SqlType,
+    sql_types::ColumnValue,
 };
 
 #[allow(dead_code)]
-impl Loader {
+impl DBLoader {
+    /// Inserts a new `Insert` operation on the [`DBLoader`].
     pub fn insert(
         &mut self,
         table_name: String,
@@ -31,7 +32,7 @@ impl Loader {
                         .expect("Invalid parsing of type"),
                 )
             })
-            .collect::<HashMap<String, SqlType>>();
+            .collect::<HashMap<String, ColumnValue>>();
         // retrieve insert operation
         let insert_op = self.new_insert_operation(table_name.clone(), primary_key_val, data);
 
@@ -58,13 +59,14 @@ impl Loader {
     }
 }
 
-impl Loader {
+impl DBLoader {
+    /// Gets the the value of a column, with type already parsed in.
     fn get_type(
         &self,
         table_name: &String,
         column_name: &String,
         value: String,
-    ) -> Result<SqlType, DBError> {
+    ) -> Result<ColumnValue, DBError> {
         let table_cols = self
             .get_tables()
             .get(table_name)
@@ -74,14 +76,16 @@ impl Loader {
             .get(column_name)
             .ok_or(DBError::ColumnNotFound(column_name.clone()))?;
 
-        SqlType::parse_type(col_type.clone(), value)
+        ColumnValue::parse_type(col_type.clone(), value)
     }
 
+    /// Given a table name, a primary key and provided data, it creates a
+    /// new operation, of type `Insert`.
     fn new_insert_operation(
         &self,
         table_name: String,
-        primary_key: SqlType,
-        data: HashMap<String, SqlType>,
+        primary_key: ColumnValue,
+        data: HashMap<String, ColumnValue>,
     ) -> Operation {
         Operation::new(
             self.get_schema().clone(),
