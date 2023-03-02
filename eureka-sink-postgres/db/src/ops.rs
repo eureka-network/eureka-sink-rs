@@ -37,9 +37,9 @@ pub trait DBLoaderOperations {
 impl DBLoaderOperations for DBLoader {
     fn delete(
         &mut self,
-        table_name: String,
-        primary_key: String,
-        data: HashMap<String, String>,
+        _table_name: String,
+        _primary_key: String,
+        _data: HashMap<String, String>,
     ) -> Result<(), DBError> {
         unimplemented!("To be implemented!")
     }
@@ -94,9 +94,9 @@ impl DBLoaderOperations for DBLoader {
 
     fn update(
         &mut self,
-        table_name: String,
-        primary_key: String,
-        data: HashMap<String, String>,
+        _table_name: String,
+        _primary_key: String,
+        _data: HashMap<String, String>,
     ) -> Result<(), DBError> {
         unimplemented!("To be implemented!")
     }
