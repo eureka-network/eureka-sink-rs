@@ -35,7 +35,7 @@ pub trait DBLoaderOperations {
 
 #[allow(dead_code)]
 impl DBLoaderOperations for DBLoader {
-    pub fn delete(
+    fn delete(
         &mut self,
         table_name: String,
         primary_key: String,
@@ -44,7 +44,7 @@ impl DBLoaderOperations for DBLoader {
         unimplemented!("To be implemented!")
     }
 
-    pub fn insert(
+    fn insert(
         &mut self,
         table_name: String,
         primary_key: String,
@@ -92,7 +92,7 @@ impl DBLoaderOperations for DBLoader {
         Ok(())
     }
 
-    pub fn update(
+    fn update(
         &mut self,
         table_name: String,
         primary_key: String,
