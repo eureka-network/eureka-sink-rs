@@ -11,7 +11,7 @@ fn ingest(block: eth::Block) -> Result<RecordChanges, substreams::errors::Error>
     Ok(RecordChanges {
         record_changes: vec![RecordChange {
             record: "eth-block-header".to_string(),
-            id: Hex(&header.parent_hash).to_string(),
+            id: Hex(&block.hash).to_string(),
             ordinal: 0,
             operation: pb::record_change::Operation::Create.into(),
             fields: vec![
