@@ -11,6 +11,7 @@ use eureka_sink_postgres::{
 };
 use hex::encode;
 
+use crate::pb::Value;
 use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
 use substreams_sink::{pb::response::Message, BlockRef, Cursor, SubstreamsSink};
 use tokio_stream::StreamExt;
@@ -132,12 +133,10 @@ async fn main() {
                                 let table_name = op.record.clone();
                                 let id = op.id.clone();
                                 let ordinal = op.ordinal;
-                                // TODO: is block_height missing? 
+                                // TODO: is block_height missing?
                                 // clock.number
-                                let primary_key_label = format!(
-                                    "{}<{}_{}>",
-                                    DOMAIN_SEPARATION_LABEL, id, ordinal
-                                );
+                                let primary_key_label =
+                                    format!("{}<{}_{}>", DOMAIN_SEPARATION_LABEL, id, ordinal);
                                 let mut hasher = Blake2s256::new();
                                 hasher.update(primary_key_label);
                                 let primary_key = hasher.finalize();
@@ -145,8 +144,9 @@ async fn main() {
                                 let primary_key = encode(primary_key.as_slice());
                                 match op.operation {
                                     1 => {
-                                        let data =
-                                            op.fields.iter().fold(HashMap::new(), |mut data, field| {
+                                        let data = op.fields.iter().fold(
+                                            HashMap::new(),
+                                            |mut data, field| {
                                                 let col_name = field.name.clone();
                                                 assert!(
                                                     field.old_value.is_none(),
@@ -155,11 +155,14 @@ async fn main() {
                                                 let new_value = field.new_value.as_ref().unwrap();
                                                 let new_value = match parse_type_of(new_value) {
                                                     ColumnArrayOrValue::Value(v) => v,
-                                                    ColumnArrayOrValue::Array(_) => panic!("Not implemented"),
+                                                    ColumnArrayOrValue::Array(_) => {
+                                                        panic!("Not implemented")
+                                                    }
                                                 };
                                                 data.insert(col_name.clone(), new_value);
                                                 data
-                                            });
+                                            },
+                                        );
                                         db_loader
                                             .insert(table_name, primary_key, data)
                                             .expect("Failed to insert data in the DB");
@@ -188,4 +191,56 @@ fn decode<T: std::default::Default + prost::Message>(
     buf: &Vec<u8>,
 ) -> Result<T, prost::DecodeError> {
     ::prost::Message::decode(&buf[..])
+}
+
+enum ColumnArrayOrValue {
+    Value(ColumnValue),
+    Array(Vec<ColumnArrayOrValue>),
+}
+
+fn parse_type_of(val: &Value) -> ColumnArrayOrValue {
+    let typed = val.typed.as_ref().unwrap();
+    match typed {
+        pb::value::Typed::Int32(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Integer(Integer::set_inner(*i)));
+        }
+        // TODO: handle integer cast appropriately
+        pb::value::Typed::Uint32(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Integer(Integer::set_inner(*i as i32)))
+        }
+        pb::value::Typed::Int64(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::BigInt(BigInt::set_inner(*i)))
+        }
+        // TODO: handle integer cast appropriately
+        pb::value::Typed::Uint64(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::BigInt(BigInt::set_inner(*i as i64)))
+        }
+        pb::value::Typed::Bigdecimal(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Decimal(Decimal::set_inner(
+                BigDecimal::from_str(b.as_str()).unwrap(),
+            )))
+        }
+        pb::value::Typed::Bigint(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::BigInt(BigInt::set_inner(
+                b.parse::<i64>().unwrap(),
+            )))
+        }
+        pb::value::Typed::String(s) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Text(Text::set_inner(s.clone())))
+        }
+        pb::value::Typed::Bytes(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Binary(Binary::set_inner(b.clone())))
+        }
+        pb::value::Typed::Bool(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Bool(Bool::set_inner(b.clone())))
+        }
+        pb::value::Typed::Array(a) => {
+            return ColumnArrayOrValue::Array(
+                a.value
+                    .iter()
+                    .map(|v| parse_type_of(v))
+                    .collect::<Vec<ColumnArrayOrValue>>(),
+            )
+        }
+    }
 }

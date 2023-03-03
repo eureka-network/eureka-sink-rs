@@ -59,12 +59,7 @@ impl DBLoaderOperations for DBLoader {
         // get data correct field type
         let data = data
             .iter()
-            .map(|(colname, val)| {
-                (
-                    colname.clone(),
-                    val.clone(),
-                )
-            })
+            .map(|(colname, val)| (colname.clone(), val.clone()))
             .collect::<HashMap<String, ColumnValue>>();
         // retrieve insert operation
         let insert_op = self.new_insert_operation(table_name.clone(), primary_key_val, data);
