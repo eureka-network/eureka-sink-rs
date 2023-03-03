@@ -1,14 +1,26 @@
+use bigdecimal::BigDecimal;
+use blake2::{Blake2s256, Digest};
 use clap_serde_derive::{
     clap::{self, Parser},
     ClapSerde,
 };
-use eureka_sink_postgres;
-use std::{fs::File, io::Read};
+use eureka_sink_postgres::{
+    db_loader::DBLoader,
+    ops::DBLoaderOperations,
+    sql_types::{BigInt, Binary, Bool, ColumnValue, Decimal, Integer, Sql, Text},
+};
+use hex::encode;
+
+use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
 use substreams_sink::{pb::response::Message, BlockRef, Cursor, SubstreamsSink};
 use tokio_stream::StreamExt;
+
 pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/sepana.ingest.v1.rs"));
 }
+
+const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
+const PRIMARY_KEY_LEN: usize = 32;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -30,12 +42,6 @@ struct Config {
     /// Package file name (*.pkg)
     #[clap(short, long)]
     package_file_name: String,
-    /// SQL Schema file name (*.sql)
-    #[clap(long)]
-    schema_file_name: String,
-    /// Postgres DSN
-    #[clap(long)]
-    postgres_dsn: String,
     /// Module name
     #[clap(short, long)]
     module_name: String,
@@ -45,6 +51,14 @@ struct Config {
     /// End block
     #[clap(short, long, default_value = "0")]
     end_block: u64,
+    /// Postgres database source name to establish DB connection
+    #[clap(short, long)]
+    postgres_dsn: String,
+    /// DB schema name
+    #[clap(short, long)]
+    schema: String,
+    /// SQL Schema file name (*.sql)
+    schema_file_name: String,
 }
 
 #[tokio::main]
@@ -67,6 +81,7 @@ async fn main() {
         || config.package_file_name.len() == 0
         || config.module_name.len() == 0
         || config.schema_file_name.len() == 0
+        || config.schema.len() == 0
         || config.postgres_dsn.len() == 0
         || (config.start_block == 0 && config.end_block == 0)
     {
@@ -74,10 +89,7 @@ async fn main() {
         return;
     }
 
-    let _db_loader = eureka_sink_postgres::db_loader::DBLoader::new(
-        config.postgres_dsn,
-        config.schema_file_name,
-    ).unwrap();
+    let mut db_loader = DBLoader::new(config.postgres_dsn, config.schema).unwrap();
 
     let mut client = SubstreamsSink::connect(config.firehose_endpoint, &config.package_file_name)
         .await
@@ -116,9 +128,50 @@ async fn main() {
                     match output.data.unwrap() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
                             let ops: pb::RecordChanges = decode(&d.value).unwrap();
-                            println!("{}\n{:?}", d.type_url, ops);
-                            // todo: implement
-                            // table.insert(ops, cursor)?;
+                            for op in &ops.record_changes {
+                                let table_name = op.record.clone();
+                                let id = op.id.clone();
+                                let ordinal = op.ordinal;
+                                // TODO: is block_height missing? 
+                                // clock.number
+                                let primary_key_label = format!(
+                                    "{}<{}_{}>",
+                                    DOMAIN_SEPARATION_LABEL, id, ordinal
+                                );
+                                let mut hasher = Blake2s256::new();
+                                hasher.update(primary_key_label);
+                                let primary_key = hasher.finalize();
+                                // convert to hex representation
+                                let primary_key = encode(primary_key.as_slice());
+                                match op.operation {
+                                    1 => {
+                                        let data =
+                                            op.fields.iter().fold(HashMap::new(), |mut data, field| {
+                                                let col_name = field.name.clone();
+                                                assert!(
+                                                    field.old_value.is_none(),
+                                                    "insert operation is append only"
+                                                );
+                                                let new_value = field.new_value.as_ref().unwrap();
+                                                let new_value = match parse_type_of(new_value) {
+                                                    ColumnArrayOrValue::Value(v) => v,
+                                                    ColumnArrayOrValue::Array(_) => panic!("Not implemented"),
+                                                };
+                                                data.insert(col_name.clone(), new_value);
+                                                data
+                                            });
+                                        db_loader
+                                            .insert(table_name, primary_key, data)
+                                            .expect("Failed to insert data in the DB");
+                                    }
+                                    0 | 2 | 3 => {
+                                        unimplemented!("To be implemented!")
+                                    }
+                                    _ => {
+                                        panic!("Invalid proto value for operation enum")
+                                    }
+                                }
+                            }
                         }
                         _ => {}
                     }
