@@ -1,27 +1,53 @@
-pub mod ingest {
+pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/sepana.ingest.v1.rs"));
 }
-use ingest::{IngestOperation, IngestOperations};
-use serde_json::json;
+use pb::{Field, RecordChange, RecordChanges};
 use substreams::Hex;
 use substreams_ethereum::pb::eth::v2 as eth;
 
 #[substreams::handlers::map]
-fn ingest(block: eth::Block) -> Result<IngestOperations, substreams::errors::Error> {
+fn block_meta(block: eth::Block) -> Result<RecordChanges, substreams::errors::Error> {
     let header = block.header.as_ref().unwrap();
-    Ok(IngestOperations {
-        operations: vec![IngestOperation {
-            key: Hex(&header.parent_hash).to_string(),
-            value: json!({
-                "number": block.number,
-                "hash": Hex(&block.hash).to_string(),
-                "parent_hash": Hex(&header.parent_hash).to_string(),
-                "timestamp": header.timestamp.as_ref().unwrap().to_string()
-            })
-            .to_string(),
-            block: block.number,
+    Ok(RecordChanges {
+        record_changes: vec![RecordChange {
+            record: "eth-block-header".to_string(),
+            id: Hex(&block.hash).to_string(),
             ordinal: 0,
-            r#type: ingest::ingest_operation::Type::Insert.into(),
+            operation: pb::record_change::Operation::Create.into(),
+            fields: vec![
+                Field {
+                    name: "number".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::Uint64(block.number)),
+                    }),
+                    old_value: None,
+                },
+                Field {
+                    name: "hash".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::String(Hex(&block.hash).to_string())),
+                    }),
+                    old_value: None,
+                },
+                Field {
+                    name: "parent_hash".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::String(
+                            Hex(&header.parent_hash).to_string(),
+                        )),
+                    }),
+                    old_value: None,
+                },
+                Field {
+                    name: "timestamp".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::String(
+                            header.timestamp.as_ref().unwrap().to_string(),
+                        )),
+                    }),
+                    old_value: None,
+                },
+            ],
         }],
     })
 }

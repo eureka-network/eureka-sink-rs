@@ -19,3 +19,5 @@ blake2 = "0.10.6"
 
 [build-dependencies]
 tonic-build = "0.8.4"
+
+[workspace]
