@@ -6,7 +6,7 @@ use substreams::Hex;
 use substreams_ethereum::pb::eth::v2 as eth;
 
 #[substreams::handlers::map]
-fn ingest(block: eth::Block) -> Result<RecordChanges, substreams::errors::Error> {
+fn block_meta(block: eth::Block) -> Result<RecordChanges, substreams::errors::Error> {
     let header = block.header.as_ref().unwrap();
     Ok(RecordChanges {
         record_changes: vec![RecordChange {
