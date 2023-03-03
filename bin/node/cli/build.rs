@@ -3,7 +3,7 @@ fn main() {
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_client(true)
         .compile(
-            &["../../../proto/sepana/ingest/v1/ingest.proto"],
+            &["../../../proto/sepana/ingest/v1/records.proto"],
             &["../../../proto/"],
         )
         .unwrap();

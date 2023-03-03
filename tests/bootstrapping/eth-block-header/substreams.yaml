@@ -18,7 +18,7 @@ binaries:
         file: 'target/wasm32-unknown-unknown/release/eth_block_header.wasm'
 
 modules:
-    - name: ingest
+    - name: block_meta
       kind: map
       inputs:
           - source: sf.ethereum.type.v2.Block

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package sepana.ingest.v1;
+
+// The base interface taken from the graph substreams
+message RecordChanges {
+  repeated RecordChange record_changes = 5;
+}
+
+message RecordChange {
+  string record = 1;
+  string id = 2;
+  uint64 ordinal = 3;
+  enum Operation {
+    UNSET = 0;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
+  }
+  Operation operation = 4;
+  repeated Field fields = 5;
+}
+
+message Value {
+  oneof typed {
+    int32 int32 = 1;
+    uint32 uint32 = 2;
+    int64 int64 = 3;
+    uint64 uint64 = 4;
+    string bigdecimal = 5;
+    string bigint = 6;
+    string string = 7;
+    bytes bytes = 8;
+    bool bool = 9;
+    Array array = 10;
+  }
+}
+
+message Array {
+  repeated Value value = 1;
+}
+
+message Field {
+  string name = 1;
+  optional Value new_value = 3;
+  optional Value old_value = 5;
+}
