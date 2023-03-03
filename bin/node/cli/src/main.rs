@@ -89,7 +89,26 @@ async fn main() {
         return;
     }
 
-    let mut db_loader = DBLoader::new(config.postgres_dsn, config.schema).unwrap();
+    // create a [`DBLoader`] instance
+    let mut db_loader = DBLoader::new(config.postgres_dsn, config.schema)
+        .expect("Failed to create a DBLoader instance");
+    // set up the db
+    let file_path = std::path::PathBuf::from_str(config.schema_file_name.as_str()).expect(
+        format!(
+            "Failed to parse schema_file_name = {} as a path",
+            config.schema_file_name
+        )
+        .as_str(),
+    );
+    db_loader.setup_schema(file_path).expect(
+        format!(
+            "Failed to set up schema for file name {}",
+            config.schema_file_name
+        )
+        .as_str(),
+    );
+    // load all the tables metadata to the [`DBLoader`] instance
+    db_loader.load_tables().expect("Failed to load tables");
 
     let mut client = SubstreamsSink::connect(config.firehose_endpoint, &config.package_file_name)
         .await
