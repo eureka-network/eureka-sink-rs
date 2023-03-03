@@ -47,11 +47,12 @@ impl Cursor {
 
 pub struct SubstreamsSink<T> {
     inner: StreamClient<T>,
+    package: pb::Package,
 }
 
 impl SubstreamsSink<tonic::transport::Channel> {
     /// Attempt to create a new client by connecting to a given endpoint.
-    pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
+    pub async fn connect<D>(dst: D, package_file_name: &str) -> anyhow::Result<Self>
     where
         D: std::convert::TryInto<tonic::transport::Endpoint>,
         D::Error: Into<StdError>,
@@ -61,30 +62,30 @@ impl SubstreamsSink<tonic::transport::Channel> {
             inner: StreamClient::new(conn)
                 .accept_compressed(CompressionEncoding::Gzip)
                 .send_compressed(CompressionEncoding::Gzip),
+            package: ::prost::Message::decode(&std::fs::read(package_file_name)?[..])?,
         })
+    }
+
+    pub fn get_package_meta(&self) -> &Vec<pb::PackageMetadata> {
+        &self.package.package_meta
     }
 
     /// Create stream for a manifest package module.
     pub async fn get_stream(
         &mut self,
-        package_file_name: &str,
         module_name: &str,
         start_block_num: i64,
         stop_block_num: u64,
         start_cursor: &str,
         irreversibility_condition: &str,
     ) -> Result<tonic::Response<tonic::codec::Streaming<Response>>, tonic::Status> {
-        let pkg: pb::Package =
-            ::prost::Message::decode(
-                &std::fs::read(package_file_name).map_err(|e| {
-                    Status::invalid_argument(format!("failed to read package: {}", e))
-                })?[..],
-            )
-            .map_err(|e| Status::invalid_argument(format!("failed to decode package: {}", e)))?;
-
-        let modules = pkg.modules.ok_or(Status::invalid_argument(
-            "failed to find modules in package".to_string(),
-        ))?;
+        let modules = self
+            .package
+            .modules
+            .clone()
+            .ok_or(Status::invalid_argument(
+                "failed to find modules in package".to_string(),
+            ))?;
 
         let request = Request {
             start_block_num,
