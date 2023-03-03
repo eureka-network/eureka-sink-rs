@@ -21,7 +21,6 @@ pub mod pb {
 }
 
 const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
-const PRIMARY_KEY_LEN: usize = 32;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
