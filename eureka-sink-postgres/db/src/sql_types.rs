@@ -37,19 +37,19 @@ pub struct Bool {
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`SmallInt`] instance.
 pub struct SmallInt {
-    inner: u16,
+    inner: i16,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`Integer`] instance.
 pub struct Integer {
-    inner: u32,
+    inner: i32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 /// A diesel compatible [`BigInt`] instance.
 pub struct BigInt {
-    inner: u64,
+    inner: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -107,9 +107,9 @@ pub struct Interval {
 }
 
 sql_type_impl!(Bool, diesel::sql_types::Bool, bool);
-sql_type_impl!(SmallInt, diesel::sql_types::SmallInt, u16);
-sql_type_impl!(Integer, diesel::sql_types::Integer, u32);
-sql_type_impl!(BigInt, diesel::sql_types::BigInt, u64);
+sql_type_impl!(SmallInt, diesel::sql_types::SmallInt, i16);
+sql_type_impl!(Integer, diesel::sql_types::Integer, i32);
+sql_type_impl!(BigInt, diesel::sql_types::BigInt, i64);
 sql_type_impl!(Float, diesel::sql_types::Float, f32);
 sql_type_impl!(Double, diesel::sql_types::Double, f64);
 sql_type_impl!(Numeric, diesel::sql_types::Numeric, BigDecimal);
@@ -464,22 +464,22 @@ mod tests {
         let sql_bool = ColumnValue::Bool(Bool { inner: true });
         assert_eq!(sql_bool.to_string(), "true".to_string());
 
-        let sql_small_int = ColumnValue::SmallInt(SmallInt { inner: 1_u16 });
+        let sql_small_int = ColumnValue::SmallInt(SmallInt { inner: 1_i16 });
         assert_eq!(sql_small_int.to_string(), "1".to_string());
 
-        let sql_int2 = ColumnValue::Int2(Int2 { inner: 1_u16 });
+        let sql_int2 = ColumnValue::Int2(Int2 { inner: 1_i16 });
         assert_eq!(sql_int2.to_string(), "1".to_string());
 
-        let sql_integer = ColumnValue::Integer(Integer { inner: 1_u32 });
+        let sql_integer = ColumnValue::Integer(Integer { inner: 1_i32 });
         assert_eq!(sql_integer.to_string(), "1".to_string());
 
-        let sql_int4 = ColumnValue::Int4(Int4 { inner: 1_u32 });
+        let sql_int4 = ColumnValue::Int4(Int4 { inner: 1_i32 });
         assert_eq!(sql_int4.to_string(), "1".to_string());
 
-        let sql_big_int = ColumnValue::BigInt(BigInt { inner: 1_u64 });
+        let sql_big_int = ColumnValue::BigInt(BigInt { inner: 1_i64 });
         assert_eq!(sql_big_int.to_string(), "1".to_string());
 
-        let sql_int8 = ColumnValue::Int8(Int8 { inner: 1_u64 });
+        let sql_int8 = ColumnValue::Int8(Int8 { inner: 1_i64 });
         assert_eq!(sql_int8.to_string(), "1".to_string());
 
         let sql_float = ColumnValue::Float(Float { inner: 1.2 });

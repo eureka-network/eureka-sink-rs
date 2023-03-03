@@ -76,8 +76,8 @@ async fn main() {
 
     let _db_loader = eureka_sink_postgres::db_loader::DBLoader::new(
         config.postgres_dsn,
-        "not implemented".to_string(),
-    );
+        config.schema_file_name,
+    ).unwrap();
 
     let mut client = SubstreamsSink::connect(config.firehose_endpoint, &config.package_file_name)
         .await

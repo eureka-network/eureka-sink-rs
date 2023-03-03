@@ -221,7 +221,7 @@ mod tests {
         let data = HashMap::from([
             (
                 "col1".to_string(),
-                ColumnValue::Integer(Integer::set_inner(10_u32)),
+                ColumnValue::Integer(Integer::set_inner(10_i32)),
             ),
             (
                 "col2".to_string(),

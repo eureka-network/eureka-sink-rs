@@ -15,21 +15,21 @@ pub trait DBLoaderOperations {
         &mut self,
         table_name: String,
         primary_key: String,
-        data: HashMap<String, String>,
+        data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError>;
     /// Inserts a new [`Insert`] operation in the [`DBLoader`]
     fn insert(
         &mut self,
         table_name: String,
         primary_key: String,
-        data: HashMap<String, String>,
+        data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError>;
     /// Inserts a new [`Update`] operation in the [`DBLoader`]
     fn update(
         &mut self,
         table_name: String,
         primary_key: String,
-        data: HashMap<String, String>,
+        data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError>;
 }
 
@@ -39,7 +39,7 @@ impl DBLoaderOperations for DBLoader {
         &mut self,
         _table_name: String,
         _primary_key: String,
-        _data: HashMap<String, String>,
+        _data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError> {
         unimplemented!("To be implemented!")
     }
@@ -48,7 +48,7 @@ impl DBLoaderOperations for DBLoader {
         &mut self,
         table_name: String,
         primary_key: String,
-        data: HashMap<String, String>,
+        data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError> {
         // get primary key correct field type
         let primary_key_colname = self
@@ -62,8 +62,7 @@ impl DBLoaderOperations for DBLoader {
             .map(|(colname, val)| {
                 (
                     colname.clone(),
-                    self.get_type(&table_name, &colname, val.clone())
-                        .expect("Invalid parsing of type"),
+                    val.clone(),
                 )
             })
             .collect::<HashMap<String, ColumnValue>>();
@@ -96,7 +95,7 @@ impl DBLoaderOperations for DBLoader {
         &mut self,
         _table_name: String,
         _primary_key: String,
-        _data: HashMap<String, String>,
+        _data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError> {
         unimplemented!("To be implemented!")
     }
