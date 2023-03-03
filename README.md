@@ -19,12 +19,6 @@ docker compose up
 Open `http://localhost:8081` to see the PostgreSQL
 
 ## Building
-We depend on `.proto` files from StreamingFast, to load these initialise git submodules:
-```
-  git submodule init
-  git submodule update
-```
-then Cargo will generate the necessary protobuf definitions before building automatically
 ```
   cargo build
 ```
