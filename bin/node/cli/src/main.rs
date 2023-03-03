@@ -1,14 +1,26 @@
+use bigdecimal::BigDecimal;
+use blake2::{Blake2s256, Digest};
 use clap_serde_derive::{
     clap::{self, Parser},
     ClapSerde,
 };
-use eureka_sink_postgres;
-use std::{fs::File, io::Read};
+use eureka_sink_postgres::{
+    db_loader::DBLoader,
+    ops::DBLoaderOperations,
+    sql_types::{BigInt, Binary, Bool, ColumnValue, Decimal, Integer, Sql, Text},
+};
+use hex::encode;
+
+use crate::pb::Value;
+use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
 use substreams_sink::{pb::response::Message, BlockRef, Cursor, SubstreamsSink};
 use tokio_stream::StreamExt;
+
 pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/sepana.ingest.v1.rs"));
 }
+
+const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -30,12 +42,6 @@ struct Config {
     /// Package file name (*.pkg)
     #[clap(short, long)]
     package_file_name: String,
-    /// SQL Schema file name (*.sql)
-    #[clap(long)]
-    schema_file_name: String,
-    /// Postgres DSN
-    #[clap(long)]
-    postgres_dsn: String,
     /// Module name
     #[clap(short, long)]
     module_name: String,
@@ -45,6 +51,14 @@ struct Config {
     /// End block
     #[clap(short, long, default_value = "0")]
     end_block: u64,
+    /// Postgres database source name to establish DB connection
+    #[clap(short, long)]
+    postgres_dsn: String,
+    /// DB schema name
+    #[clap(short, long)]
+    schema: String,
+    /// SQL Schema file name (*.sql)
+    schema_file_name: String,
 }
 
 #[tokio::main]
@@ -67,6 +81,7 @@ async fn main() {
         || config.package_file_name.len() == 0
         || config.module_name.len() == 0
         || config.schema_file_name.len() == 0
+        || config.schema.len() == 0
         || config.postgres_dsn.len() == 0
         || (config.start_block == 0 && config.end_block == 0)
     {
@@ -74,10 +89,26 @@ async fn main() {
         return;
     }
 
-    let _db_loader = eureka_sink_postgres::db_loader::DBLoader::new(
-        config.postgres_dsn,
-        "not implemented".to_string(),
+    // create a [`DBLoader`] instance
+    let mut db_loader = DBLoader::new(config.postgres_dsn, config.schema)
+        .expect("Failed to create a DBLoader instance");
+    // set up the db
+    let file_path = std::path::PathBuf::from_str(config.schema_file_name.as_str()).expect(
+        format!(
+            "Failed to parse schema_file_name = {} as a path",
+            config.schema_file_name
+        )
+        .as_str(),
     );
+    db_loader.setup_schema(file_path).expect(
+        format!(
+            "Failed to set up schema for file name {}",
+            config.schema_file_name
+        )
+        .as_str(),
+    );
+    // load all the tables metadata to the [`DBLoader`] instance
+    db_loader.load_tables().expect("Failed to load tables");
 
     let mut client = SubstreamsSink::connect(config.firehose_endpoint, &config.package_file_name)
         .await
@@ -116,9 +147,52 @@ async fn main() {
                     match output.data.unwrap() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
                             let ops: pb::RecordChanges = decode(&d.value).unwrap();
-                            println!("{}\n{:?}", d.type_url, ops);
-                            // todo: implement
-                            // table.insert(ops, cursor)?;
+                            for op in &ops.record_changes {
+                                let table_name = op.record.clone();
+                                let id = op.id.clone();
+                                let ordinal = op.ordinal;
+                                // TODO: is block_height missing?
+                                // clock.number
+                                let primary_key_label =
+                                    format!("{}<{}_{}>", DOMAIN_SEPARATION_LABEL, id, ordinal);
+                                let mut hasher = Blake2s256::new();
+                                hasher.update(primary_key_label);
+                                let primary_key = hasher.finalize();
+                                // convert to hex representation
+                                let primary_key = encode(primary_key.as_slice());
+                                match op.operation {
+                                    1 => {
+                                        let data = op.fields.iter().fold(
+                                            HashMap::new(),
+                                            |mut data, field| {
+                                                let col_name = field.name.clone();
+                                                assert!(
+                                                    field.old_value.is_none(),
+                                                    "insert operation is append only"
+                                                );
+                                                let new_value = field.new_value.as_ref().unwrap();
+                                                let new_value = match parse_type_of(new_value) {
+                                                    ColumnArrayOrValue::Value(v) => v,
+                                                    ColumnArrayOrValue::Array(_) => {
+                                                        panic!("Not implemented")
+                                                    }
+                                                };
+                                                data.insert(col_name.clone(), new_value);
+                                                data
+                                            },
+                                        );
+                                        db_loader
+                                            .insert(table_name, primary_key, data)
+                                            .expect("Failed to insert data in the DB");
+                                    }
+                                    0 | 2 | 3 => {
+                                        unimplemented!("To be implemented!")
+                                    }
+                                    _ => {
+                                        panic!("Invalid proto value for operation enum")
+                                    }
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -135,4 +209,56 @@ fn decode<T: std::default::Default + prost::Message>(
     buf: &Vec<u8>,
 ) -> Result<T, prost::DecodeError> {
     ::prost::Message::decode(&buf[..])
+}
+
+enum ColumnArrayOrValue {
+    Value(ColumnValue),
+    Array(Vec<ColumnArrayOrValue>),
+}
+
+fn parse_type_of(val: &Value) -> ColumnArrayOrValue {
+    let typed = val.typed.as_ref().unwrap();
+    match typed {
+        pb::value::Typed::Int32(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Integer(Integer::set_inner(*i)));
+        }
+        // TODO: handle integer cast appropriately
+        pb::value::Typed::Uint32(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Integer(Integer::set_inner(*i as i32)))
+        }
+        pb::value::Typed::Int64(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::BigInt(BigInt::set_inner(*i)))
+        }
+        // TODO: handle integer cast appropriately
+        pb::value::Typed::Uint64(i) => {
+            return ColumnArrayOrValue::Value(ColumnValue::BigInt(BigInt::set_inner(*i as i64)))
+        }
+        pb::value::Typed::Bigdecimal(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Decimal(Decimal::set_inner(
+                BigDecimal::from_str(b.as_str()).unwrap(),
+            )))
+        }
+        pb::value::Typed::Bigint(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::BigInt(BigInt::set_inner(
+                b.parse::<i64>().unwrap(),
+            )))
+        }
+        pb::value::Typed::String(s) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Text(Text::set_inner(s.clone())))
+        }
+        pb::value::Typed::Bytes(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Binary(Binary::set_inner(b.clone())))
+        }
+        pb::value::Typed::Bool(b) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Bool(Bool::set_inner(b.clone())))
+        }
+        pb::value::Typed::Array(a) => {
+            return ColumnArrayOrValue::Array(
+                a.value
+                    .iter()
+                    .map(|v| parse_type_of(v))
+                    .collect::<Vec<ColumnArrayOrValue>>(),
+            )
+        }
+    }
 }
