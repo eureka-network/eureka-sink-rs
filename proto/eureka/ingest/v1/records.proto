@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package sepana.ingest.v1;
+package eureka.ingest.v1;
 
 // The base interface taken from the graph substreams
 message RecordChanges {

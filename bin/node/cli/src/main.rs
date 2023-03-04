@@ -17,7 +17,7 @@ use substreams_sink::{pb::response::Message, BlockRef, Cursor, SubstreamsSink};
 use tokio_stream::StreamExt;
 
 pub mod pb {
-    include!(concat!(env!("OUT_DIR"), "/sepana.ingest.v1.rs"));
+    include!(concat!(env!("OUT_DIR"), "/eureka.ingest.v1.rs"));
 }
 
 const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
@@ -46,10 +46,10 @@ struct Config {
     #[clap(short, long)]
     module_name: String,
     /// Start block
-    #[clap(short, long, default_value = "0")]
+    #[clap(short, long, default_value = "100")]
     start_block: i64,
     /// End block
-    #[clap(short, long, default_value = "0")]
+    #[clap(short, long, default_value = "100000")]
     end_block: u64,
     /// Postgres database source name to establish DB connection
     #[clap(short, long)]

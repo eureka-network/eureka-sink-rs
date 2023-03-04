@@ -13,7 +13,7 @@ use std::{
 /// It provides functionality to deal with generic tables as well as a `cursors` table
 /// (https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-postgres#cursors).
 pub struct DBLoader {
-    /// A PostgresSQL connection do a DB.
+    /// A PostgresSQL connection to a postgres instance.
     connection: PgConnection,
     /// Database name
     database: String,
@@ -60,7 +60,7 @@ impl DBLoader {
 
     /// Loads all necessary tables that exist for the current schema and DB.
     pub fn load_tables(&mut self) -> Result<(), DBError> {
-        #[derive(QueryableByName)]
+        #[derive(QueryableByName, Debug)]
         pub struct TableMetadata {
             #[diesel(sql_type = diesel::sql_types::Text)]
             table_name: String,
@@ -87,10 +87,14 @@ impl DBLoader {
             .load::<TableMetadata>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
+        println!("all tables and columns found: {:?}", all_tables_and_cols);
+
         let all_tables = all_tables_and_cols
             .iter()
             .map(|q| q.table_name.clone())
             .collect::<HashSet<_>>();
+
+        println!("all tables found: {:?}", all_tables);
 
         for table in all_tables {
             let cols = all_tables_and_cols
@@ -119,6 +123,8 @@ impl DBLoader {
 
             // TODO: for now we only insert the first primary key column,
             // following the Golang repo. Should we instead be more general ?
+
+            println!("inserting primary key {} for table {}", primary_key, table);
             self.table_primary_keys.insert(table, primary_key);
         }
 
@@ -199,6 +205,7 @@ impl DBLoader {
         &self.schema
     }
 
+    // todo: this returns None for
     pub fn get_primary_key_column_name(&self, table_name: &String) -> Option<String> {
         self.table_primary_keys.get(table_name).cloned()
     }
