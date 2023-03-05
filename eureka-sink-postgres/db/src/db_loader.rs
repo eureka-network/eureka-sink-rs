@@ -37,8 +37,14 @@ impl DBLoader {
             .map_err(|e| DBError::InvalidDSNParsing(e))?
             .database
             .unwrap_or_default();
-        let connection = PgConnection::establish(dsn_string.as_str())
+        let mut connection = PgConnection::establish(dsn_string.as_str())
             .map_err(|e| DBError::ConnectionError(e))?;
+
+        // if schema does not exist in the DB, create it
+        let query = format!("CREATE SCHEMA IF NOT EXISTS {}", schema_namespace);
+        sql_query(query)
+            .execute(&mut connection)
+            .map_err(|e| DBError::DieselError(e))?;
 
         Ok(Self {
             connection: connection,
@@ -199,7 +205,7 @@ impl DBLoader {
         &self.schema
     }
 
-    pub fn get_primary_key_column_name(&self, table_name: &String) -> Option<String> {
+    pub fn get_primary_key_column_name(&self, table_name: &str) -> Option<String> {
         self.table_primary_keys.get(table_name).cloned()
     }
 
@@ -228,7 +234,7 @@ impl DBLoader {
     }
 
     /// Checks if `table` exists in the current db and schema state.
-    pub fn has_table(&self, table: &String) -> bool {
+    pub fn has_table(&self, table: &str) -> bool {
         self.tables.get(table).is_some()
     }
 

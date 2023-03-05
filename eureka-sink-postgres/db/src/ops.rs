@@ -100,18 +100,18 @@ impl DBLoader {
     /// Gets the the value of a column, with type already parsed in.
     fn get_type(
         &self,
-        table_name: &String,
-        column_name: &String,
+        table_name: &str,
+        column_name: &str,
         value: String,
     ) -> Result<ColumnValue, DBError> {
         let table_cols = self
             .get_tables()
             .get(table_name)
-            .ok_or(DBError::TableNotFound(table_name.clone()))?;
+            .ok_or(DBError::TableNotFound(String::from(table_name)))?;
 
         let col_type = table_cols
             .get(column_name)
-            .ok_or(DBError::ColumnNotFound(column_name.clone()))?;
+            .ok_or(DBError::ColumnNotFound(String::from(column_name)))?;
 
         ColumnValue::parse_type(col_type.clone(), value)
     }
@@ -125,7 +125,7 @@ impl DBLoader {
         data: HashMap<String, ColumnValue>,
     ) -> Operation {
         Operation::new(
-            self.get_schema().clone(),
+            String::from(self.get_schema()),
             table_name.clone(),
             self.get_primary_key_column_name(&table_name)
                 .expect(format!("Primary key column not valid for table: {}", table_name).as_ref()),

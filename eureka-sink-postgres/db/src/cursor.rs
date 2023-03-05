@@ -11,7 +11,7 @@ pub trait CursorLoader {
     /// Updates the current state of the `cursors` table, given an `output_module_hash`
     /// value and a [`Cursor`] instance.
     fn update_cursor_query(
-        schema: &String,
+        schema: &str,
         module_hash: String,
         cursor: Cursor,
         conn: &mut PgConnection,
@@ -19,7 +19,7 @@ pub trait CursorLoader {
     /// Writes a new entry to the `cursors` table, given an `output_module_hash` value
     /// and a [`Cursor`] instance.
     fn write_cursor(
-        schema: &String,
+        schema: &str,
         module_hash: String,
         cursor: Cursor,
         conn: &mut PgConnection,
@@ -67,7 +67,7 @@ impl CursorLoader for DBLoader {
     }
 
     fn update_cursor_query(
-        schema: &String,
+        schema: &str,
         module_hash: String,
         cursor: Cursor,
         conn: &mut PgConnection,
@@ -86,7 +86,7 @@ impl CursorLoader for DBLoader {
     }
 
     fn write_cursor(
-        schema: &String,
+        schema: &str,
         module_hash: String,
         cursor: Cursor,
         conn: &mut PgConnection,
