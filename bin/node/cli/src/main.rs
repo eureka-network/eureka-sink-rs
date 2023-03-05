@@ -137,6 +137,8 @@ async fn main() {
         .unwrap()
         .into_inner();
 
+    let table_name = config.module_name.clone();
+
     while let Some(resp) = stream.next().await {
         match resp.unwrap().message.unwrap() {
             Message::Data(data) => {
@@ -148,7 +150,6 @@ async fn main() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
                             let ops: pb::RecordChanges = decode(&d.value).unwrap();
                             for op in &ops.record_changes {
-                                let table_name = op.record.clone();
                                 let id = op.id.clone();
                                 let ordinal = op.ordinal;
                                 // TODO: is block_height missing?
@@ -182,7 +183,7 @@ async fn main() {
                                             },
                                         );
                                         db_loader
-                                            .insert(table_name, primary_key, data)
+                                            .insert(table_name.clone(), primary_key, data)
                                             .expect("Failed to insert data in the DB");
                                     }
                                     0 | 2 | 3 => {
