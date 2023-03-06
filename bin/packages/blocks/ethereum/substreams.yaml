@@ -1,6 +1,6 @@
 specVersion: v0.1.0
 package:
-    name: eth_block_header
+    name: eth_blockheaders
     version: v0.1.0
 
 imports:
@@ -15,7 +15,7 @@ protobuf:
 binaries:
     default:
         type: wasm/rust-v1
-        file: 'target/wasm32-unknown-unknown/release/eth_block_header.wasm'
+        file: 'target/wasm32-unknown-unknown/release/eth_blockheaders.wasm'
 
 modules:
     - name: block_meta

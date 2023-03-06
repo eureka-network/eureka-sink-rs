@@ -132,6 +132,10 @@ impl DBLoader {
 
             println!("inserting primary key {} for table {}", primary_key, table);
             self.table_primary_keys.insert(table, primary_key);
+            println!(
+                "table primary keys: {:?}",
+                self.table_primary_keys.clone()
+            );
         }
 
         Ok(())
@@ -212,6 +216,7 @@ impl DBLoader {
     }
 
     pub fn get_primary_key_column_name(&self, table_name: &str) -> Option<String> {
+        println!("getting primary key for table {}", table_name);
         self.table_primary_keys.get(table_name).cloned()
     }
 
@@ -290,7 +295,7 @@ impl DBLoader {
     /// Given a table name, it outputs its primary key column name
     fn get_primary_key_from_table(&mut self, table: &str) -> Result<String, DBError> {
         // auxiliary type to be used as the output of executing query
-        #[derive(QueryableByName)]
+        #[derive(QueryableByName, Debug)]
         pub struct PrimaryKey {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pk: String,
@@ -302,16 +307,21 @@ impl DBLoader {
             FROM   pg_index i
             JOIN   pg_attribute a ON a.attrelid = i.indrelid
                                 AND a.attnum = ANY(i.indkey)
-            WHERE  i.indrelid = '$1.$2'::regclass
+            WHERE  i.indrelid = '{}.{}'::regclass
             AND    i.indisprimary;
-        "
-        );
+            ",
+            self.schema.clone(), table);
+println!("query: {}", query);
 
+        // let primary_keys = sql_query(query)
+        //     .bind::<diesel::sql_types::Text, _>(self.schema.clone())
+        //     .bind::<diesel::sql_types::Text, _>(table)
+        //     .load::<PrimaryKey>(self.connection())
+        //     .map_err(|e| DBError::DieselError(e))?;
         let primary_keys = sql_query(query)
-            .bind::<diesel::sql_types::Text, _>(self.schema.clone())
-            .bind::<diesel::sql_types::Text, _>(table)
             .load::<PrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
+println!("primary_keys: {:?}", primary_keys);
 
         // For now we assume our tables only have one primary key column
         let primary_key = primary_keys.first().ok_or(DBError::EmptyQuery(format!(

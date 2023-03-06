@@ -50,6 +50,7 @@ impl DBLoaderOperations for DBLoader {
         primary_key: String,
         data: HashMap<String, ColumnValue>,
     ) -> Result<(), DBError> {
+        println!("Inserting into table {} with primary key {}", &table_name, &primary_key);
         // get primary key correct field type
         let primary_key_colname = self
             .get_primary_key_column_name(&table_name)

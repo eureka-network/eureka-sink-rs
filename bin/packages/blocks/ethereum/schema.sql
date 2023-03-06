@@ -1,7 +1,6 @@
-create table if not exists ethereummainnet.eth_block_headers
+create table if not exists ethereummainnet.eth_blockheaders
 (
-    id          text not null constraint eth_block_headers_pk primary key,
-    at          text,
+    id          text not null constraint eth_blockheaders_pk primary key,
     number      integer,
     hash        text,
     parent_hash text,

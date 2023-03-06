@@ -1,5 +1,5 @@
 [package]
-name = "eth_block_header"
+name = "eth_blockheaders"
 version = "0.1.0"
 edition = "2021"
 

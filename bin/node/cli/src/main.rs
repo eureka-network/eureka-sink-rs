@@ -6,6 +6,7 @@ use clap_serde_derive::{
 };
 use eureka_sink_postgres::{
     db_loader::DBLoader,
+    flush::FlushLoader,
     ops::DBLoaderOperations,
     sql_types::{BigInt, Binary, Bool, ColumnValue, Decimal, Integer, Sql, Text},
 };
@@ -139,11 +140,12 @@ async fn main() {
 
     while let Some(resp) = stream.next().await {
         match resp.unwrap().message.unwrap() {
-            Message::Data(data) => {
-                let clock = data.clock.unwrap();
-                let cursor = Cursor::new(data.cursor, BlockRef::new(clock.id, clock.number));
+            Message::Data(block_scoped_data) => {
+                let clock = block_scoped_data.clock.unwrap();
+                let cursor = Cursor::new(block_scoped_data.cursor,
+                    BlockRef::new(clock.id, clock.number));
                 println!("cursor: {:?}", cursor);
-                for output in data.outputs {
+                for output in block_scoped_data.outputs {
                     match output.data.unwrap() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
                             let ops: pb::RecordChanges = decode(&d.value).unwrap();
@@ -196,9 +198,14 @@ async fn main() {
                         }
                         _ => {}
                     }
+                    // todo: flush is now per module output; it might make more sense per block?
+                    match db_loader.flush(output.name, cursor.clone()) {
+                        Ok(()) => {},
+                        Err(e) => panic!("Couldn't flush operations to postgres: {}", e),
+                    };
                 }
-                // todo: implement
-                // table.flush();
+                // todo: can we flush here per block?
+                // db_loader.flush()
             }
             _ => {}
         }

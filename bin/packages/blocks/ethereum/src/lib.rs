@@ -10,7 +10,7 @@ fn block_meta(block: eth::Block) -> Result<RecordChanges, substreams::errors::Er
     let header = block.header.as_ref().unwrap();
     Ok(RecordChanges {
         record_changes: vec![RecordChange {
-            record: "eth_block_header".to_string(),
+            record: "eth_blockheaders".to_string(),
             id: Hex(&block.hash).to_string(),
             ordinal: 0,
             operation: pb::record_change::Operation::Create.into(),
