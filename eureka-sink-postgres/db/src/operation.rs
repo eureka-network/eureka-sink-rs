@@ -102,15 +102,15 @@ impl Operation {
         query
     }
 
-    pub fn schema_name(&self) -> &String {
+    pub fn schema_name(&self) -> &str {
         &self.schema_name
     }
 
-    pub fn table_name(&self) -> &String {
+    pub fn table_name(&self) -> &str {
         &self.table_name
     }
 
-    pub fn primary_key_column_name(&self) -> &String {
+    pub fn primary_key_column_name(&self) -> &str {
         &self.primary_key_column_name
     }
 

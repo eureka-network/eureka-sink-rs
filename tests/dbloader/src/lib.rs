@@ -41,9 +41,7 @@ fn it_works_load_tables() {
     // assert tables are correctly specified
     let tables = loader.get_available_tables_in_schema();
     assert_eq!(tables.len(), 2);
-    assert!(
-        tables.contains(&String::from("block_meta")) && tables.contains(&String::from("cursors"))
-    );
+    assert!(tables.contains("block_meta") && tables.contains("cursors"));
 
     // assert that column types are correctly specified
     let columns_per_table = loader.get_tables();
