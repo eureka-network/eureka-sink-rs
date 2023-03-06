@@ -1,6 +1,6 @@
 # Ethereum blocks package
 
-This package will build the ethereum block headers into the anchor database (from an ethereum compatible chain).
+This package will store the ethereum block headers into the anchor database (from an ethereum compatible chain).
 
 ## Getting started
 
