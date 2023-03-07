@@ -32,8 +32,9 @@ impl FlushLoader for DBLoader {
                     }
                 });
                 // update the cursors table
-                Self::update_cursor_query(&schema, output_module_hash, cursor, conn)
-                    .expect("Failed to update cursors table");
+                Self::write_cursor(&schema, output_module_hash.clone(), cursor.clone(), conn)
+                    .expect("Failed to upsert in cursors table");
+
                 Ok(())
             })
             .map_err(|e| DBError::DieselError(e))?;

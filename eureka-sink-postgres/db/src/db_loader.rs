@@ -132,10 +132,7 @@ impl DBLoader {
 
             println!("inserting primary key {} for table {}", primary_key, table);
             self.table_primary_keys.insert(table, primary_key);
-            println!(
-                "table primary keys: {:?}",
-                self.table_primary_keys.clone()
-            );
+            println!("table primary keys: {:?}", self.table_primary_keys.clone());
         }
 
         Ok(())
@@ -311,8 +308,10 @@ impl DBLoader {
             WHERE  i.indrelid = '{}.{}'::regclass
             AND    i.indisprimary;
             ",
-            self.schema.clone(), table);
-println!("query: {}", query);
+            self.schema.clone(),
+            table
+        );
+        println!("query: {}", query);
 
         // let primary_keys = sql_query(query)
         //     .bind::<diesel::sql_types::Text, _>(self.schema.clone())
@@ -322,7 +321,7 @@ println!("query: {}", query);
         let primary_keys = sql_query(query)
             .load::<PrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
-println!("primary_keys: {:?}", primary_keys);
+        println!("primary_keys: {:?}", primary_keys);
 
         // For now we assume our tables only have one primary key column
         let primary_key = primary_keys.first().ok_or(DBError::EmptyQuery(format!(
