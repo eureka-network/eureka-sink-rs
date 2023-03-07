@@ -240,7 +240,7 @@ impl DBLoader {
 
     pub fn set_up_cursor_table(&mut self) -> Result<(), DBError> {
         sql_query(
-            "CREATE TABLE IF NOT EXISTS cursors
+            "CREATE TABLE IF NOT EXISTS $1.cursors
 		(
 			id         TEXT NOT NULL CONSTRAINT cursor_pk PRIMARY KEY,
 			cursor     TEXT,
@@ -249,6 +249,7 @@ impl DBLoader {
 		);
 	    ",
         )
+        .bind::<diesel::sql_types::Text, _>(self.get_schema().clone())
         .execute(self.connection())
         .map_err(|e| DBError::DieselError(e))?;
 
