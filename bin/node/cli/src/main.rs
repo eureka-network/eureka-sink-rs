@@ -47,18 +47,19 @@ struct Config {
     #[clap(short, long)]
     module_name: String,
     /// Start block
-    #[clap(short, long, default_value = "100")]
+    #[clap(short, long)]
     start_block: i64,
     /// End block
-    #[clap(short, long, default_value = "100000")]
+    #[clap(short, long)]
     end_block: u64,
     /// Postgres database source name to establish DB connection
-    #[clap(short, long)]
+    #[clap(long)]
     postgres_dsn: String,
     /// DB schema name
-    #[clap(short, long)]
+    #[clap(long)]
     schema: String,
     /// SQL Schema file name (*.sql)
+    #[clap(long)]
     schema_file_name: String,
 }
 
@@ -142,8 +143,10 @@ async fn main() {
         match resp.unwrap().message.unwrap() {
             Message::Data(block_scoped_data) => {
                 let clock = block_scoped_data.clock.unwrap();
-                let cursor = Cursor::new(block_scoped_data.cursor,
-                    BlockRef::new(clock.id, clock.number));
+                let cursor = Cursor::new(
+                    block_scoped_data.cursor,
+                    BlockRef::new(clock.id, clock.number),
+                );
                 println!("cursor: {:?}", cursor);
                 for output in block_scoped_data.outputs {
                     match output.data.unwrap() {
@@ -206,7 +209,7 @@ async fn main() {
                     }
                     // todo: flush is now per module output; it might make more sense per block?
                     match db_loader.flush(output.name, cursor.clone()) {
-                        Ok(()) => {},
+                        Ok(()) => {}
                         Err(e) => panic!("Couldn't flush operations to postgres: {}", e),
                     };
                 }
