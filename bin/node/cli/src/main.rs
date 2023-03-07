@@ -6,6 +6,7 @@ use clap_serde_derive::{
 };
 use eureka_sink_postgres::{
     db_loader::DBLoader,
+    flush::FlushLoader,
     ops::DBLoaderOperations,
     sql_types::{BigInt, Binary, Bool, ColumnValue, Decimal, Integer, Sql, Text},
 };
@@ -17,7 +18,7 @@ use substreams_sink::{pb::response::Message, BlockRef, Cursor, SubstreamsSink};
 use tokio_stream::StreamExt;
 
 pub mod pb {
-    include!(concat!(env!("OUT_DIR"), "/sepana.ingest.v1.rs"));
+    include!(concat!(env!("OUT_DIR"), "/eureka.ingest.v1.rs"));
 }
 
 const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
@@ -46,18 +47,19 @@ struct Config {
     #[clap(short, long)]
     module_name: String,
     /// Start block
-    #[clap(short, long, default_value = "0")]
+    #[clap(short, long)]
     start_block: i64,
     /// End block
-    #[clap(short, long, default_value = "0")]
+    #[clap(short, long)]
     end_block: u64,
     /// Postgres database source name to establish DB connection
-    #[clap(short, long)]
+    #[clap(long)]
     postgres_dsn: String,
     /// DB schema name
-    #[clap(short, long)]
+    #[clap(long)]
     schema: String,
     /// SQL Schema file name (*.sql)
+    #[clap(long)]
     schema_file_name: String,
 }
 
@@ -139,11 +141,14 @@ async fn main() {
 
     while let Some(resp) = stream.next().await {
         match resp.unwrap().message.unwrap() {
-            Message::Data(data) => {
-                let clock = data.clock.unwrap();
-                let cursor = Cursor::new(data.cursor, BlockRef::new(clock.id, clock.number));
+            Message::Data(block_scoped_data) => {
+                let clock = block_scoped_data.clock.unwrap();
+                let cursor = Cursor::new(
+                    block_scoped_data.cursor,
+                    BlockRef::new(clock.id, clock.number),
+                );
                 println!("cursor: {:?}", cursor);
-                for output in data.outputs {
+                for output in block_scoped_data.outputs {
                     match output.data.unwrap() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
                             let ops: pb::RecordChanges = decode(&d.value).unwrap();
@@ -202,9 +207,14 @@ async fn main() {
                         }
                         _ => {}
                     }
+                    // todo: flush is now per module output; it might make more sense per block?
+                    match db_loader.flush(output.name, cursor.clone()) {
+                        Ok(()) => {}
+                        Err(e) => panic!("Couldn't flush operations to postgres: {}", e),
+                    };
                 }
-                // todo: implement
-                // table.flush();
+                // todo: can we flush here per block?
+                // db_loader.flush()
             }
             _ => {}
         }

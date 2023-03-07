@@ -13,7 +13,7 @@ use std::{
 /// It provides functionality to deal with generic tables as well as a `cursors` table
 /// (https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-postgres#cursors).
 pub struct DBLoader {
-    /// A PostgresSQL connection do a DB.
+    /// A PostgresSQL connection to a postgres instance.
     connection: PgConnection,
     /// Database name
     database: String,
@@ -66,7 +66,7 @@ impl DBLoader {
 
     /// Loads all necessary tables that exist for the current schema and DB.
     pub fn load_tables(&mut self) -> Result<(), DBError> {
-        #[derive(QueryableByName)]
+        #[derive(QueryableByName, Debug)]
         pub struct TableMetadata {
             #[diesel(sql_type = diesel::sql_types::Text)]
             table_name: String,
@@ -93,10 +93,14 @@ impl DBLoader {
             .load::<TableMetadata>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
+        println!("all tables and columns found: {:?}", all_tables_and_cols);
+
         let all_tables = all_tables_and_cols
             .iter()
             .map(|q| q.table_name.clone())
             .collect::<HashSet<_>>();
+
+        println!("all tables found: {:?}", all_tables);
 
         for table in all_tables {
             let cols = all_tables_and_cols
@@ -125,7 +129,13 @@ impl DBLoader {
 
             // TODO: for now we only insert the first primary key column,
             // following the Golang repo. Should we instead be more general ?
+
+            println!("inserting primary key {} for table {}", primary_key, table);
             self.table_primary_keys.insert(table, primary_key);
+            println!(
+                "table primary keys: {:?}",
+                self.table_primary_keys.clone()
+            );
         }
 
         Ok(())
@@ -206,6 +216,7 @@ impl DBLoader {
     }
 
     pub fn get_primary_key_column_name(&self, table_name: &str) -> Option<String> {
+        println!("getting primary key for table {}", table_name);
         self.table_primary_keys.get(table_name).cloned()
     }
 
@@ -239,8 +250,8 @@ impl DBLoader {
     }
 
     pub fn set_up_cursor_table(&mut self) -> Result<(), DBError> {
-        sql_query(
-            "CREATE TABLE IF NOT EXISTS cursors
+        sql_query(format!(
+            "CREATE TABLE IF NOT EXISTS {}.cursors
 		(
 			id         TEXT NOT NULL CONSTRAINT cursor_pk PRIMARY KEY,
 			cursor     TEXT,
@@ -248,7 +259,8 @@ impl DBLoader {
 			block_id   TEXT
 		);
 	    ",
-        )
+            self.get_schema().clone()
+        ))
         .execute(self.connection())
         .map_err(|e| DBError::DieselError(e))?;
 
@@ -284,7 +296,7 @@ impl DBLoader {
     /// Given a table name, it outputs its primary key column name
     fn get_primary_key_from_table(&mut self, table: &str) -> Result<String, DBError> {
         // auxiliary type to be used as the output of executing query
-        #[derive(QueryableByName)]
+        #[derive(QueryableByName, Debug)]
         pub struct PrimaryKey {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pk: String,
@@ -296,16 +308,21 @@ impl DBLoader {
             FROM   pg_index i
             JOIN   pg_attribute a ON a.attrelid = i.indrelid
                                 AND a.attnum = ANY(i.indkey)
-            WHERE  i.indrelid = '$1.$2'::regclass
+            WHERE  i.indrelid = '{}.{}'::regclass
             AND    i.indisprimary;
-        "
-        );
+            ",
+            self.schema.clone(), table);
+println!("query: {}", query);
 
+        // let primary_keys = sql_query(query)
+        //     .bind::<diesel::sql_types::Text, _>(self.schema.clone())
+        //     .bind::<diesel::sql_types::Text, _>(table)
+        //     .load::<PrimaryKey>(self.connection())
+        //     .map_err(|e| DBError::DieselError(e))?;
         let primary_keys = sql_query(query)
-            .bind::<diesel::sql_types::Text, _>(self.schema.clone())
-            .bind::<diesel::sql_types::Text, _>(table)
             .load::<PrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
+println!("primary_keys: {:?}", primary_keys);
 
         // For now we assume our tables only have one primary key column
         let primary_key = primary_keys.first().ok_or(DBError::EmptyQuery(format!(

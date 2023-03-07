@@ -5,7 +5,7 @@ A Rust library to synchronize Substreams manifest data ingestion to PostgreSQL.
 
 copy your `STREAMINGFAST_KEY` into a `.env` file. (You can get an API key on https://app.streamingfast.io/)
 
-then run `source ./firehouse_token.sh` to get `SUBSTREAMS_API_TOKEN` set in your local shell.
+then run `source ./firehose_token.sh` to get `SUBSTREAMS_API_TOKEN` set in your local shell.
 
 ## Getting Started
 
