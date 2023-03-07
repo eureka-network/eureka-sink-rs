@@ -28,8 +28,6 @@ pub struct DBLoader {
     tables: HashMap<String, HashMap<String, ColumnType>>,
     /// For each table_name we provide an array of its primary key column names.
     table_primary_keys: HashMap<String, String>,
-    /// keeps track of module_names on [`cursors`] table
-    cursors: HashSet<String>,
 }
 
 #[allow(dead_code)]
@@ -56,7 +54,6 @@ impl DBLoader {
             entries_count: 0,
             tables: HashMap::new(),
             table_primary_keys: HashMap::new(),
-            cursors: HashSet::new(),
         })
     }
 
