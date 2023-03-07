@@ -92,7 +92,10 @@ impl CursorLoader for DBLoader {
         conn: &mut PgConnection,
     ) -> Result<usize, DBError> {
         let query = format!(
-            "INSERT INTO {}.cursors (id, cursor, block_num, block_id) VALUES ($1, $2, $3, $4)",
+            "
+                INSERT INTO {}.cursors (id, cursor, block_num, block_id) VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (id) DO UPDATE SET cursor=$2, block_num=$3, block_id=$3 
+            ",
             schema
         );
         sql_query(query)

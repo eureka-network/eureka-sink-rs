@@ -35,6 +35,8 @@ pub enum DBError {
     EmptyQuery(String),
     #[error("Invalid column data type: {0}")]
     InvalidColumnDataType(String),
+    #[error("Unique violation error")]
+    UniqueViolation,
 }
 
 // impl From<DBError> for diesel::result::Error {
