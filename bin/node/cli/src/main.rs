@@ -153,6 +153,9 @@ async fn main() {
                                 let table_name = op.record.clone();
                                 let id = op.id.clone();
                                 let ordinal = op.ordinal;
+                                // get primary key column name
+                                let primary_key_column_name =
+                                    db_loader.get_primary_key_column_name(&table_name).unwrap();
                                 // TODO: is block_height missing?
                                 // clock.number
                                 let primary_key_label =
@@ -164,9 +167,13 @@ async fn main() {
                                 let primary_key = encode(primary_key.as_slice());
                                 match op.operation {
                                     1 => {
-                                        let data = op.fields.iter().fold(
-                                            HashMap::new(),
-                                            |mut data, field| {
+                                        // set data initially with primary key
+                                        let data = HashMap::from([(
+                                            primary_key_column_name,
+                                            ColumnValue::Text(Text::set_inner(primary_key.clone())),
+                                        )]);
+                                        let data =
+                                            op.fields.iter().fold(data, |mut data, field| {
                                                 let col_name = field.name.clone();
                                                 assert!(
                                                     field.old_value.is_none(),
@@ -181,8 +188,7 @@ async fn main() {
                                                 };
                                                 data.insert(col_name.clone(), new_value);
                                                 data
-                                            },
-                                        );
+                                            });
                                         db_loader
                                             .insert(table_name, primary_key, data)
                                             .expect("Failed to insert data in the DB");
@@ -263,7 +269,7 @@ fn parse_type_of(val: &Value) -> ColumnArrayOrValue {
             return ColumnArrayOrValue::Array(
                 a.value
                     .iter()
-                    .map(|v| parse_type_of(v))
+                    .map(parse_type_of)
                     .collect::<Vec<ColumnArrayOrValue>>(),
             )
         }
