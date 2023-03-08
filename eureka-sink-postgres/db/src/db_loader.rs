@@ -93,14 +93,10 @@ impl DBLoader {
             .load::<TableMetadata>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
 
-        println!("all tables and columns found: {:?}", all_tables_and_cols);
-
         let all_tables = all_tables_and_cols
             .iter()
             .map(|q| q.table_name.clone())
             .collect::<HashSet<_>>();
-
-        println!("all tables found: {:?}", all_tables);
 
         for table in all_tables {
             let cols = all_tables_and_cols
@@ -130,9 +126,7 @@ impl DBLoader {
             // TODO: for now we only insert the first primary key column,
             // following the Golang repo. Should we instead be more general ?
 
-            println!("inserting primary key {} for table {}", primary_key, table);
             self.table_primary_keys.insert(table, primary_key);
-            println!("table primary keys: {:?}", self.table_primary_keys.clone());
         }
 
         Ok(())
@@ -213,7 +207,6 @@ impl DBLoader {
     }
 
     pub fn get_primary_key_column_name(&self, table_name: &str) -> Option<String> {
-        println!("getting primary key for table {}", table_name);
         self.table_primary_keys.get(table_name).cloned()
     }
 
@@ -311,17 +304,11 @@ impl DBLoader {
             self.schema.clone(),
             table
         );
-        println!("query: {}", query);
 
-        // let primary_keys = sql_query(query)
-        //     .bind::<diesel::sql_types::Text, _>(self.schema.clone())
-        //     .bind::<diesel::sql_types::Text, _>(table)
-        //     .load::<PrimaryKey>(self.connection())
-        //     .map_err(|e| DBError::DieselError(e))?;
+
         let primary_keys = sql_query(query)
             .load::<PrimaryKey>(self.connection())
             .map_err(|e| DBError::DieselError(e))?;
-        println!("primary_keys: {:?}", primary_keys);
 
         // For now we assume our tables only have one primary key column
         let primary_key = primary_keys.first().ok_or(DBError::EmptyQuery(format!(
