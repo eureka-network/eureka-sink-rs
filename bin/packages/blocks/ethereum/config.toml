@@ -1,4 +1,4 @@
-firehose_endpoint = "FILL IN FIREHOSE ENDPOINT"
+firehose_endpoint = "https://mainnet.eth.streamingfast.io:443"
 package_file_name = "./eth-blockheaders-v0.1.0.spkg"
 module_name = "block_meta"
 start_block = 100

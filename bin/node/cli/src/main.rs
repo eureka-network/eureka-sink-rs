@@ -76,7 +76,6 @@ async fn main() {
     } else {
         Config::from(&mut args.config)
     };
-    println!("config - {:?}", config);
 
     // Check required parameters until the macro is supported in clap-serde-derive merge
     if config.firehose_endpoint.len() == 0
@@ -116,17 +115,6 @@ async fn main() {
         .await
         .unwrap();
 
-    println!("{:?}", client.get_package_meta());
-    // todo: implement
-    /*let table = db_loader.get_table(
-        &client.get_package_meta().first().unwrap(),
-        &config.schema_file_name,
-        &config.module_name,
-    )?;*/
-
-    //let cursor = table.get_current_cursor()?;
-    // todo: (later) compare to the requested range and adjust if necessary.
-
     let mut stream = client
         .get_stream(
             &config.module_name,
@@ -147,7 +135,6 @@ async fn main() {
                     block_scoped_data.cursor,
                     BlockRef::new(clock.id, clock.number),
                 );
-                println!("cursor: {:?}", cursor);
                 for output in block_scoped_data.outputs {
                     match output.data.unwrap() {
                         substreams_sink::pb::module_output::Data::MapOutput(d) => {
