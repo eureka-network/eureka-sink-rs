@@ -2,7 +2,13 @@ pub mod pb {
     tonic::include_proto!("sf.substreams.v1");
 }
 use pb::{stream_client::StreamClient, Request, Response};
-use tonic::{codegen::*, Status};
+use tonic::{
+    codegen::{http::uri::Scheme, http::uri::Uri, *},
+    metadata::AsciiMetadataValue,
+    service::Interceptor,
+    transport::Endpoint,
+    Status,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockRef {
@@ -45,23 +51,58 @@ impl Cursor {
     }
 }
 
+/// Adds authorization token to request header
+pub struct AuthorizationTokenInjector {
+    token: Option<AsciiMetadataValue>,
+}
+
+impl Interceptor for AuthorizationTokenInjector {
+    fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
+        if let Some(token) = &self.token {
+            request
+                .metadata_mut()
+                .insert("authorization", token.clone());
+        }
+        Ok(request)
+    }
+}
+
 pub struct SubstreamsSink<T> {
-    inner: StreamClient<T>,
+    inner: StreamClient<InterceptedService<T, AuthorizationTokenInjector>>,
     package: pb::Package,
 }
 
 impl SubstreamsSink<tonic::transport::Channel> {
     /// Attempt to create a new client by connecting to a given endpoint.
-    pub async fn connect<D>(dst: D, package_file_name: &str) -> anyhow::Result<Self>
+    pub async fn connect<D: AsRef<str>>(dst: D, package_file_name: &str) -> anyhow::Result<Self>
     where
         D: std::convert::TryInto<tonic::transport::Endpoint>,
         D::Error: Into<StdError>,
     {
-        let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
+        let uri = dst.as_ref().parse::<Uri>()?;
+        let (conn, api_token) = match uri.scheme().unwrap_or(&Scheme::HTTP).as_str() {
+            "http" => (Endpoint::new(uri)?.connect().await?, None),
+            "https" => (
+                Endpoint::new(dst)?
+                    .tls_config(tonic::transport::ClientTlsConfig::new())?
+                    .connect()
+                    .await?,
+                if let Ok(v) = std::env::var("SUBSTREAMS_API_TOKEN") {
+                    Some(AsciiMetadataValue::try_from(format!("Bearer {}", v))?)
+                } else {
+                    None
+                },
+            ),
+            _ => panic!("invalid uri scheme"),
+        };
+
         Ok(SubstreamsSink {
-            inner: StreamClient::new(conn)
-                .accept_compressed(CompressionEncoding::Gzip)
-                .send_compressed(CompressionEncoding::Gzip),
+            inner: StreamClient::with_interceptor(
+                conn,
+                AuthorizationTokenInjector { token: api_token },
+            )
+            .accept_compressed(CompressionEncoding::Gzip)
+            .send_compressed(CompressionEncoding::Gzip),
             package: ::prost::Message::decode(&std::fs::read(package_file_name)?[..])?,
         })
     }
