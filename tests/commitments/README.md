@@ -1,12 +1,12 @@
-# Ethereum blocks package
+# Extract events into Poseidon tree
 
-This package will store the ethereum block headers into the anchor database (from an ethereum compatible chain).
+This package will build a Poseidon tree for all events in an ethereum block.
 
 ## Getting started
 
 - run a firehose endpoint that extracts the blockchain information of the ethereum-compatible chain.
 - have a postgres instance which will function to anchor records from the chain. (run `docker compose up` from root)
-- have cli built in `/bin/node/cli` with `cargo build --release`
+- have cli built in `/bin/node/cli` with `cargo build -p eureka-cli --release`
 - fill out a config file in `./config.toml` and run
     ```
         ../../../../target/release/eureka-cli -c ./config.toml

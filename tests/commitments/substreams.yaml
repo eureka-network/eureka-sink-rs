@@ -1,6 +1,6 @@
 specVersion: v0.1.0
 package:
-    name: eth_commit_events
+    name: eth_extract_events
     version: v0.1.0
 
 imports:
@@ -10,7 +10,7 @@ protobuf:
     files:
         - records.proto
     importPaths:
-        - ../../../../proto/eureka/ingest/v1
+        - ../../proto/eureka/ingest/v1
 
 binaries:
     default:
@@ -18,7 +18,7 @@ binaries:
         file: 'target/wasm32-unknown-unknown/release/eth_commit_events.wasm'
 
 modules:
-    - name: commit_events
+    - name: extract_events
       kind: map
       inputs:
           - source: sf.ethereum.type.v2.Block
