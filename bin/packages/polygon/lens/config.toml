@@ -1,0 +1,8 @@
+firehose_endpoint = "FILL IN FIREHOSE ENDPOINT"
+package_file_name = "./polygon-lens-v0.1.0.spkg"
+module_name = "map_posts"
+start_block = 40141202
+end_block = 40141203
+postgres_dsn = "postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable"
+schema_file_name = "./schema.sql"
+schema = "polygonmainnet"
