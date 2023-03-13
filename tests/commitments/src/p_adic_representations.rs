@@ -1,8 +1,8 @@
-use plonky2::field::goldilocks_field::GoldilocksField;
 use ethereum_types::U256;
+use plonky2::field::goldilocks_field::GoldilocksField;
 use plonky2::field::types::{Field, Field64, PrimeField64};
 
-use crate::{F, Digest, EventsCommitment};
+use crate::{Digest, EventsCommitment, F};
 
 pub(crate) fn goldilocks_adic_representation(x: U256) -> [F; 5] {
     // 5 field elements are sufficient to represent a U256 number
@@ -28,8 +28,8 @@ pub(crate) fn from_adic_representation(x: [F; 5]) -> U256 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sha256::digest;
     use hex::FromHex;
+    use sha256::digest;
 
     #[test]
     fn it_works_goldilocks_adic_repr() {

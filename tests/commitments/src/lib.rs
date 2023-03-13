@@ -5,42 +5,47 @@ pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/eureka.ingest.v1.rs"));
 }
 use pb::{Field, RecordChange, RecordChanges};
+use plonky2::field::goldilocks_field::GoldilocksField;
+use plonky2::hash::{merkle_tree::MerkleTree, poseidon::PoseidonHash};
 use substreams::Hex;
 use substreams_ethereum::pb::eth::v2 as eth;
-use plonky2::hash::{merkle_tree::MerkleTree, poseidon::PoseidonHash};
-use plonky2::field::goldilocks_field::GoldilocksField;
 
 use crate::block_commit::BlockCommitment;
 
 pub type F = GoldilocksField;
 pub type Digest = [F; 4];
 
-pub struct EventsCommitment(
-    pub MerkleTree<F, PoseidonHash>
-);
+pub struct EventsCommitment(pub MerkleTree<F, PoseidonHash>);
+
+impl EventsCommitment {
+    fn new(data: Vec<Vec<F>>) -> Self {
+        Self(MerkleTree::new(data, 0))
+    }
+
+    fn add_commitment(&mut self, leaf: Vec<F>) {}
+}
 
 #[substreams::handlers::map]
 fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors::Error> {
-    
-    let block_commitment = BlockCommitment{ block: block.clone()};
+    let mut block_commitment = BlockCommitment::new(block.clone());
     block_commitment.commit_events();
 
     Ok(RecordChanges {
-        record_changes: vec![RecordChange{
+        record_changes: vec![RecordChange {
             record: "commmits".to_string(),
             id: "1".to_string(),
             operation: pb::record_change::Operation::Create.into(),
             ordinal: 0,
-            fields: vec![Field{
+            fields: vec![Field {
                 name: "name".to_string(),
-                new_value: Some(pb::Value{
-                    typed: Some(pb::value::Typed::String("test".to_string()))
+                new_value: Some(pb::Value {
+                    typed: Some(pb::value::Typed::String("test".to_string())),
                 }),
-                old_value: None
-            }]
-        }]
+                old_value: None,
+            }],
+        }],
     })
-    // for event in block.events()  
+    // for event in block.events()
     // let header = block.header.as_ref().unwrap();
     // Ok(RecordChanges {
     //     record_changes: vec![RecordChange {
