@@ -81,17 +81,6 @@ impl BlockCommitment {
         self.events_commitment = Some(EventsCommitment(MerkleTree::new(logs, 0)));
     }
 
-    fn build_circuit(&self) -> Result<(), Error> {
-        if self.events_commitment.is_none() {
-            return Err(anyhow!("No events commitment found"));
-        }
-
-        let config = CircuitConfig::standard_recursion_zk_config();
-        let mut builder = CircuitBuilder::new(config);
-
-        Ok(())
-    }
-
     fn fill_partial_witness(&self) -> Result<(), Error> {
         Ok(())
     }
