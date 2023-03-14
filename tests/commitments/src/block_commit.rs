@@ -14,9 +14,19 @@ use plonky2::util::serialization::Buffer;
 use crate::{p_adic_representations::goldilocks_adic_representation, Digest, EventsCommitment, F};
 const U256_BYTES: usize = 32;
 
+pub struct EncodedLog {
+    tx_index: u64,
+    log_index: u64,
+    address: U256,
+    topics: Vec<U256>,
+    data: Vec<U256>,
+    goldilock_encoding: Vec<F>,
+}
+
 pub struct BlockCommitment {
     block: pb::Block,
     events_commitment: Option<EventsCommitment>,
+    encoded_logs: Option<Vec<EncodedLog>>,
 }
 
 impl BlockCommitment {
@@ -24,11 +34,15 @@ impl BlockCommitment {
         Self {
             block,
             events_commitment: None,
+            logs: None,
         }
     }
 
     pub fn commit_events(&mut self) {
-        let block = self.block.clone();
+        assert!(
+            self.events_commitment.is_none() && 
+            self.logs.is_none()
+        );
         // log:
         // txIndex  F (int)
         // logIndex F (int)
@@ -36,11 +50,13 @@ impl BlockCommitment {
         // topics   0-4 * 32 bytes
         //          [F;4]
         // data     bytes (this we can hash because we wont compute over it)
-        let mut logs: Vec<Vec<F>> = vec![];
-        for log_view in block.logs() {
+        self.logs = Some(vec![]);
+        for log_view in self.block.logs() {
+            let tx_index = log_view.receipt.transaction.index;
+            let log_index = log_view.log.index;
             // [`TransactionReceipt`] also contains a field `logs`
-            let tx_index = F::from_canonical_u32(log_view.receipt.transaction.index);
-            let log_index = F::from_canonical_u32(log_view.log.index);
+            let field_tx_index = F::from_canonical_u32(tx_index);
+            let field_log_index = F::from_canonical_u32(log_index);
             // TODO: For now we encode 20-byte addresses as U256,
             // further optimizations can be made
             let u256_address = U256::from_little_endian(&log_view.log.address);
@@ -55,7 +71,7 @@ impl BlockCommitment {
                 .iter()
                 .map(|t| goldilocks_adic_representation(t.clone()).to_vec())
                 .collect::<Vec<Vec<F>>>();
-            // TODO: check this
+            // TODO: keccak hash data into U256 -> [F;5]
             let u256_log_data = (1..(log_view.log.data.len() / U256_BYTES))
                 .map(|i| U256::from_little_endian(&log_view.log.data[i..(i + U256_BYTES)]))
                 .collect::<Vec<U256>>();
@@ -75,11 +91,23 @@ impl BlockCommitment {
             log_event.extend(goldilocks_log_data);
             log_event.extend(hash_data.elements.to_vec());
 
-            logs.push(log_event);
+            let encoded_log = new EncodedLog{
+                tx_index,
+                log_index,
+                address: u256_address,
+                topics: u256_topics,
+                data: u256_log_data
+            }
+
+            self.logs.as_mut().map(|v| v.push(log_event));
         }
 
-        self.events_commitment = Some(EventsCommitment(MerkleTree::new(logs, 0)));
+        // todo: first borrow logs to make merkle tree, then move to self
+        if let Some(logs) = &self.logs {
+            self.events_commitment = Some(EventsCommitment(MerkleTree::new(logs.clone(), 0)));
+        }
     }
+
 
     fn fill_partial_witness(&self) -> Result<(), Error> {
         Ok(())

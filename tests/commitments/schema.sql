@@ -11,5 +11,8 @@ create table if not exists ethereummainnet.eth_events (
     topic2      text,
     topic3      text,
     topic4      text,
-    data        text
+    data        text,
+    addressF    text,
+    topic0      text,
+    commitment  text,
 );

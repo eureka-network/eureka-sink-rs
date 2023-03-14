@@ -33,19 +33,42 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
     block_commitment.commit_events();
 
     Ok(RecordChanges {
-        record_changes: vec![RecordChange {
-            record: "commmits".to_string(),
-            id: "1".to_string(),
-            operation: pb::record_change::Operation::Create.into(),
-            ordinal: 0,
-            fields: vec![Field {
-                name: "name".to_string(),
-                new_value: Some(pb::Value {
-                    typed: Some(pb::value::Typed::String("test".to_string())),
-                }),
-                old_value: None,
+        for log in block_commitment.logs.unwrap() {
+            record_changes: vec![RecordChange {
+                record: "commmits".to_string(),
+                id: Hex(&block.hash).to_string(),
+                operation: pb::record_change::Operation::Create.into(),
+                ordinal: 0,
+                fields: vec![Field {
+                    name: "blocknumber".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::Uint64(block.number)),
+                    }),
+                    old_value: None,
+                },
+                Field {
+                    name: "blockhash".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::String(Hex(&block.hash).to_string())),
+                    }),
+                    old_value: None,
+                },
+                Field {
+                    name: "txindex".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::Uint64(block.number)),
+                    }),
+                    old_value: None,
+                },
+                Field {
+                    name: "logindex".to_string(),
+                    new_value: Some(pb::Value {
+                        typed: Some(pb::value::Typed::Uint64(block.number)),
+                    }),
+                    old_value: None,
+                }],
             }],
-        }],
+        }
     })
     // for event in block.events()
     // let header = block.header.as_ref().unwrap();
