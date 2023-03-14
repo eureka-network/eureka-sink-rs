@@ -22,7 +22,9 @@ impl EventsCommitment {
         Self(MerkleTree::new(data, 0))
     }
 
-    fn add_commitment(&mut self, leaf: Vec<F>) {}
+    pub fn tree_height(&self) -> usize {
+        self.0.leaves.len().trailing_zeros() as usize
+    }
 }
 
 #[substreams::handlers::map]

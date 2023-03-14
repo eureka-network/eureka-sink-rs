@@ -1,10 +1,13 @@
 use substreams_ethereum::{block_view::LogView, pb::eth::v2 as pb};
 // use plonky2::plonk::circuit_builder::CircuitBuilder;
 // use plonky2::iop::witness::{PartialWitness, WitnessWrite};
+use anyhow::{anyhow, Error};
 use ethereum_types::U256;
 use plonky2::field::goldilocks_field::GoldilocksField;
 use plonky2::field::types::Field;
 use plonky2::hash::{merkle_tree::MerkleTree, poseidon::PoseidonHash};
+use plonky2::iop::witness::PartialWitness;
+use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::config::Hasher;
 use plonky2::util::serialization::Buffer;
 
@@ -78,7 +81,20 @@ impl BlockCommitment {
         self.events_commitment = Some(EventsCommitment(MerkleTree::new(logs, 0)));
     }
 
-    fn build_circuit(&self) -> Result<(), anyhow::Error> {}
+    fn build_circuit(&self) -> Result<(), Error> {
+        if self.events_commitment.is_none() {
+            return Err(anyhow!("No events commitment found"));
+        }
+
+        let config = CircuitConfig::standard_recursion_zk_config();
+        let mut builder = CircuitBuilder::new(config);
+
+        Ok(())
+    }
+
+    fn fill_partial_witness(&self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 // #[derive(Copy, Clone)]
