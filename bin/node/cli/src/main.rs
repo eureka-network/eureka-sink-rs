@@ -21,7 +21,7 @@ pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/eureka.ingest.v1.rs"));
 }
 
-const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
+const DOMAIN_SEPARATION_LABEL: &str = "bin.node.cli.PRIMARY_KEY_INSERT_INTO";
 
 #[derive(Parser)]
 #[clap(author, version, about)]
