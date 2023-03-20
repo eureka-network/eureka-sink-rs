@@ -14,7 +14,7 @@ use eureka_sink_postgres::{
 };
 use hex::encode;
 
-use offchain::{HTTPSLinkResolver, Resolver};
+use offchain::{HTTPSLinkResolver, ArweaveLinkResolver, Resolver};
 use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
 use substreams_sink::pb;
 use substreams_sink::{
@@ -123,6 +123,10 @@ async fn main() {
         .with_link_resolver(
             "https".to_string(),
             Box::new(HTTPSLinkResolver::new().expect("failed to create HTTP client")),
+        )
+        .with_link_resolver(
+            "ar".to_string(),
+            Box::new(ArweaveLinkResolver::new().expect("failed to create HTTP client")),
         )
         /* todo:: enable
         .with_link_resolver(
