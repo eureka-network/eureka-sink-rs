@@ -1,0 +1,21 @@
+[package]
+name = "offchain"
+version = "0.1.0"
+edition = "2021"
+description = "Offchain content resolver"
+
+[dependencies]
+log = "0.4"
+prost = { version = "0.11.6" }
+prost-types = "0.11.6"
+tonic = { version = "0.8.3", features = ["gzip", "tls-roots"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio-util = { version = "0.7.7", features = ["full"] }
+wasmer = "3.1.1"
+async-trait = "0.1.66"
+anyhow = "1.0"
+sqlx = { version = "0.6", features = [ "postgres", "tls", "runtime-tokio-rustls", "json", "offline" ] }
+futures = "0.3.24"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+int-enum = "0.5"
+substreams-sink = { path = "../substreams-sink" }

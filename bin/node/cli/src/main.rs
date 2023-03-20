@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 use bigdecimal::BigDecimal;
 use blake2::{Blake2s256, Digest};
 use clap_serde_derive::{
@@ -12,14 +14,13 @@ use eureka_sink_postgres::{
 };
 use hex::encode;
 
-use crate::pb::Value;
+use offchain::{HTTPSLinkResolver, Resolver};
 use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
-use substreams_sink::{pb::response::Message, BlockRef, Cursor, SubstreamsSink};
+use substreams_sink::pb;
+use substreams_sink::{
+    pb::Value, substreams::pb::response::Message, BlockRef, Cursor, SubstreamsSink,
+};
 use tokio_stream::StreamExt;
-
-pub mod pb {
-    include!(concat!(env!("OUT_DIR"), "/eureka.ingest.v1.rs"));
-}
 
 const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
 
@@ -65,6 +66,7 @@ struct Config {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     let mut args = Args::parse();
     let config = if let Ok(mut f) = File::open(&args.config_file) {
         let mut contents = String::new();
@@ -86,12 +88,12 @@ async fn main() {
         || config.postgres_dsn.len() == 0
         || (config.start_block == 0 && config.end_block == 0)
     {
-        println!("Missing or invalid arguments. Use -h for help.");
+        error!("Missing or invalid arguments. Use -h for help.");
         return;
     }
 
     // create a [`DBLoader`] instance
-    let mut db_loader = DBLoader::new(config.postgres_dsn, config.schema)
+    let mut db_loader = DBLoader::new(config.postgres_dsn.clone(), config.schema.clone())
         .expect("Failed to create a DBLoader instance");
     // set up the db
     let file_path = std::path::PathBuf::from_str(config.schema_file_name.as_str()).expect(
@@ -115,6 +117,26 @@ async fn main() {
         .await
         .unwrap();
 
+    let mut resolver = Resolver::new(&config.postgres_dsn)
+        .await
+        .expect("Failed to connect DB state")
+        .with_link_resolver(
+            "https".to_string(),
+            Box::new(HTTPSLinkResolver::new().expect("failed to create HTTP client")),
+        )
+        /* todo:: enable
+        .with_link_resolver(
+            "ipfs".to_string(),
+            Box::new(IPFSLinkResolver::new().expect("failed to create IPFS client")),
+        ) */
+        .with_parser(
+            config.schema.clone(),
+            client
+                .get_binary(&config.module_name)
+                .expect("Failed to load manifest binary"),
+        )
+        .expect("Failed to create wasm vm");
+
     let mut stream = client
         .get_stream(
             &config.module_name,
@@ -137,8 +159,8 @@ async fn main() {
                 );
                 for output in block_scoped_data.outputs {
                     match output.data.unwrap() {
-                        substreams_sink::pb::module_output::Data::MapOutput(d) => {
-                            let ops: pb::RecordChanges = decode(&d.value).unwrap();
+                        substreams_sink::substreams::pb::module_output::Data::MapOutput(d) => {
+                            let ops: substreams_sink::pb::RecordChanges = decode(&d.value).unwrap();
                             for op in &ops.record_changes {
                                 let table_name = op.record.clone();
                                 let id = op.id.clone();
@@ -158,27 +180,41 @@ async fn main() {
                                 match op.operation {
                                     1 => {
                                         // set data initially with primary key
-                                        let data = HashMap::from([(
+                                        let mut data = HashMap::from([(
                                             primary_key_column_name,
                                             ColumnValue::Text(Text::set_inner(primary_key.clone())),
                                         )]);
-                                        let data =
-                                            op.fields.iter().fold(data, |mut data, field| {
-                                                let col_name = field.name.clone();
-                                                assert!(
-                                                    field.old_value.is_none(),
-                                                    "insert operation is append only"
-                                                );
-                                                let new_value = field.new_value.as_ref().unwrap();
-                                                let new_value = match parse_type_of(new_value) {
-                                                    ColumnArrayOrValue::Value(v) => v,
-                                                    ColumnArrayOrValue::Array(_) => {
-                                                        panic!("Not implemented")
-                                                    }
-                                                };
-                                                data.insert(col_name.clone(), new_value);
-                                                data
-                                            });
+                                        for field in &op.fields {
+                                            let col_name = field.name.clone();
+                                            assert!(
+                                                field.old_value.is_none(),
+                                                "insert operation is append only"
+                                            );
+                                            let new_value = field.new_value.as_ref().unwrap();
+                                            let new_value = match parse_type_of(new_value) {
+                                                ColumnArrayOrValue::Value(v) => v,
+                                                ColumnArrayOrValue::Array(_) => {
+                                                    panic!("Not implemented")
+                                                }
+                                            };
+                                            data.insert(col_name.clone(), new_value);
+                                            let typed = field
+                                                .new_value
+                                                .as_ref()
+                                                .unwrap()
+                                                .typed
+                                                .to_owned()
+                                                .unwrap();
+                                            match typed {
+                                                pb::value::Typed::Offchaindata(request) => {
+                                                    resolver
+                                                        .add_task(&config.schema, request)
+                                                        .await
+                                                        .expect("Failed to add task.");
+                                                }
+                                                _ => {}
+                                            }
+                                        }
                                         db_loader
                                             .insert(table_name, primary_key, data)
                                             .expect("Failed to insert data in the DB");
@@ -206,6 +242,8 @@ async fn main() {
             _ => {}
         }
     }
+    info!("Resolving offchain content...");
+    resolver.run(true).await.expect("failed to run resolver");
 }
 
 fn decode<T: std::default::Default + prost::Message>(
@@ -262,6 +300,9 @@ fn parse_type_of(val: &Value) -> ColumnArrayOrValue {
                     .map(parse_type_of)
                     .collect::<Vec<ColumnArrayOrValue>>(),
             )
+        }
+        pb::value::Typed::Offchaindata(d) => {
+            return ColumnArrayOrValue::Value(ColumnValue::Text(Text::set_inner(d.uri.clone())))
         }
     }
 }

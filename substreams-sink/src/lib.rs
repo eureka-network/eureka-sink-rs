@@ -1,7 +1,14 @@
 pub mod pb {
-    tonic::include_proto!("sf.substreams.v1");
+    tonic::include_proto!("eureka.ingest.v1");
 }
-use pb::{stream_client::StreamClient, Request, Response};
+pub mod substreams {
+    pub mod pb {
+        tonic::include_proto!("sf.substreams.v1");
+    }
+}
+
+pub use pb::{OffchainData, OffchainDataContent, OffchainDataRecord, OffchainDataRecords};
+use substreams::pb::{stream_client::StreamClient, Package, PackageMetadata, Request, Response};
 use tonic::{
     codegen::{http::uri::Scheme, http::uri::Uri, *},
     metadata::AsciiMetadataValue,
@@ -69,7 +76,7 @@ impl Interceptor for AuthorizationTokenInjector {
 
 pub struct SubstreamsSink<T> {
     inner: StreamClient<InterceptedService<T, AuthorizationTokenInjector>>,
-    package: pb::Package,
+    package: Package,
 }
 
 impl SubstreamsSink<tonic::transport::Channel> {
@@ -107,8 +114,28 @@ impl SubstreamsSink<tonic::transport::Channel> {
         })
     }
 
-    pub fn get_package_meta(&self) -> &Vec<pb::PackageMetadata> {
+    pub fn get_package_meta(&self) -> &Vec<PackageMetadata> {
         &self.package.package_meta
+    }
+
+    pub fn get_binary(&self, module_name: &str) -> Option<&[u8]> {
+        if let Some(modules) = &self.package.modules {
+            modules.modules.iter().find_map(|m| {
+                if m.name == module_name {
+                    return Some(
+                        modules
+                            .binaries
+                            .get(m.binary_index as usize)?
+                            .content
+                            .as_slice(),
+                    );
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        }
     }
 
     /// Create stream for a manifest package module.

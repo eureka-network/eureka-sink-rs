@@ -6,8 +6,8 @@ pub mod pb {
 }
 mod parser;
 use pb::{
-    record_change::Operation, value::Typed, Field, OffchainData, OffchainDataContent, RecordChange,
-    RecordChanges, Value,
+    record_change::Operation, value::Typed, Field, OffchainData, OffchainDataContent,
+    OffchainDataRecords, RecordChange, RecordChanges, Value,
 };
 use substreams::scalar::BigInt;
 use substreams::{hex, Hex};
@@ -21,8 +21,9 @@ pub fn map_posts(block: eth::Block) -> Result<RecordChanges, substreams::errors:
     let record_changes: Result<Vec<_>, _> = block
         .events::<PostCreated>(&[&LENS_HUB_PROXY])
         .map(|(event, log)| {
+            let record = "lens_posts".to_string();
             Ok(RecordChange {
-                record: "lens_posts".to_string(),
+                record: record.clone(),
                 id: get_post_id(&event.profile_id, &event.pub_id),
                 ordinal: log.ordinal(),
                 operation: Operation::Create.into(),
@@ -42,8 +43,8 @@ pub fn map_posts(block: eth::Block) -> Result<RecordChanges, substreams::errors:
                             typed: Some(Typed::Offchaindata(OffchainData {
                                 uri: event.content_uri,
                                 handler: "parse_offchain_data".to_string(),
-                                max_retries: 10,
-                                wait_before_retry: 60,
+                                max_retries: 3,
+                                wait_before_retry: 5,
                             })),
                         }),
                         old_value: None,
@@ -67,23 +68,13 @@ pub fn map_posts(block: eth::Block) -> Result<RecordChanges, substreams::errors:
 #[substreams::handlers::map]
 pub fn parse_offchain_data(
     content: OffchainDataContent,
-) -> Result<RecordChanges, substreams::errors::Error> {
+) -> Result<OffchainDataRecords, substreams::errors::Error> {
     match parser::parse_content(&content) {
         Ok(v) => Ok(v),
-        Err(_e) => Ok(RecordChanges {
-            record_changes: vec![RecordChange {
-                record: "lens_posts_offchain".to_string(),
-                id: content.id,
-                ordinal: 0,
-                operation: Operation::Create.into(),
-                fields: vec![Field {
-                    name: "state".to_string(),
-                    new_value: Some(Value {
-                        typed: Some(Typed::Uint32(parser::State::ParsingFailed as u32)),
-                    }),
-                    old_value: None,
-                }],
-            }],
+        Err(_) => Ok(OffchainDataRecords {
+            uri: content.uri,
+            manifest: content.manifest,
+            records: Vec::new(),
         }),
     }
 }

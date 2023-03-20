@@ -8,10 +8,10 @@ create table if not exists polygonmainnet.lens_posts
 
 create table if not exists polygonmainnet.lens_posts_offchain
 (
-    id      text not null constraint lens_posts_offchain_pk primary key,
+    uri     text,
     app_id  text,
     name    text,
     content text,
-    state   integer,
+    PRIMARY KEY (uri, app_id)
 );
 

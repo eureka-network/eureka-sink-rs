@@ -50,11 +50,23 @@ message Field {
 message OffchainData {
     string uri = 1;
     string handler = 2;
-    uint32 max_retries = 3;
-    uint32 wait_before_retry = 4;
+    int32 max_retries = 3;
+    int32 wait_before_retry = 4;
 }
 
 message OffchainDataContent {
-    string id = 1;
-    string content = 2;
+    string uri = 1;
+    string manifest = 2;
+    string content = 3;
+}
+
+message OffchainDataRecords {
+  string uri = 1;
+  string manifest = 2;
+  repeated OffchainDataRecord records = 3;
+}
+
+message OffchainDataRecord {
+  string record = 1;
+  repeated Field fields = 2;
 }

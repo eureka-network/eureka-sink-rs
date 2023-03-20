@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use super::error::ParseError;
-use super::{PostAttribute, PostMedia, State};
+use super::{PostAttribute, PostMedia};
 use crate::pb::{
-    record_change::Operation, value::Typed, Field, OffchainDataContent, RecordChange,
-    RecordChanges, Value,
+    value::Typed, Field, OffchainDataContent, OffchainDataRecord, OffchainDataRecords, Value,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -21,17 +20,23 @@ pub struct Post {
     media: Vec<PostMedia>,
 }
 
-pub fn parse(content: &OffchainDataContent) -> Result<RecordChanges, ParseError> {
+pub fn parse(content: &OffchainDataContent) -> Result<OffchainDataRecords, ParseError> {
     let data: Post = serde_json::from_str(&content.content)
         .map_err(|e| ParseError::FormatError(e.to_string()))?;
 
-    Ok(RecordChanges {
-        record_changes: vec![RecordChange {
+    Ok(OffchainDataRecords {
+        manifest: content.manifest.clone(),
+        uri: content.uri.clone(),
+        records: vec![OffchainDataRecord {
             record: "lens_posts_offchain".to_string(),
-            id: content.id.clone(),
-            ordinal: 0,
-            operation: Operation::Create.into(),
             fields: vec![
+                Field {
+                    name: "uri".to_string(),
+                    new_value: Some(Value {
+                        typed: Some(Typed::String(content.uri.clone())),
+                    }),
+                    old_value: None,
+                },
                 Field {
                     name: "app_id".to_string(),
                     new_value: Some(Value {
@@ -53,20 +58,7 @@ pub fn parse(content: &OffchainDataContent) -> Result<RecordChanges, ParseError>
                     }),
                     old_value: None,
                 },
-                Field {
-                    name: "state".to_string(),
-                    new_value: Some(Value {
-                        typed: Some(Typed::Uint32(1)),
-                    }),
-                    old_value: None,
-                },
-                Field {
-                    name: "state".to_string(),
-                    new_value: Some(Value {
-                        typed: Some(Typed::Uint32(State::Completed as u32)),
-                    }),
-                    old_value: None,
-                }, // todo: add fields
+                 // todo: add fields
             ],
         }],
     })
