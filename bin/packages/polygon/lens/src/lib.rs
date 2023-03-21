@@ -4,7 +4,11 @@ pub mod abi {
 pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/eureka.ingest.v1.rs"));
 }
-use pb::{value::Typed, Field, RecordChange, RecordChanges, Value};
+mod parser;
+use pb::{
+    record_change::Operation, value::Typed, Field, OffchainData, OffchainDataContent,
+    OffchainDataRecords, RecordChange, RecordChanges, Value,
+};
 use substreams::scalar::BigInt;
 use substreams::{hex, Hex};
 use substreams_ethereum::pb::eth::v2 as eth;
@@ -17,11 +21,12 @@ pub fn map_posts(block: eth::Block) -> Result<RecordChanges, substreams::errors:
     let record_changes: Result<Vec<_>, _> = block
         .events::<PostCreated>(&[&LENS_HUB_PROXY])
         .map(|(event, log)| {
+            let record = "lens_posts".to_string();
             Ok(RecordChange {
-                record: "lens_posts".to_string(),
+                record: record.clone(),
                 id: get_post_id(&event.profile_id, &event.pub_id),
                 ordinal: log.ordinal(),
-                operation: pb::record_change::Operation::Create.into(),
+                operation: Operation::Create.into(),
                 fields: vec![
                     Field {
                         name: "profile_id".to_string(),
@@ -35,7 +40,12 @@ pub fn map_posts(block: eth::Block) -> Result<RecordChanges, substreams::errors:
                     Field {
                         name: "content_uri".to_string(),
                         new_value: Some(Value {
-                            typed: Some(Typed::String(event.content_uri)),
+                            typed: Some(Typed::Offchaindata(OffchainData {
+                                uri: event.content_uri,
+                                handler: "parse_offchain_data".to_string(),
+                                max_retries: 3,
+                                wait_before_retry: 5,
+                            })),
                         }),
                         old_value: None,
                     },
@@ -53,6 +63,20 @@ pub fn map_posts(block: eth::Block) -> Result<RecordChanges, substreams::errors:
     Ok(RecordChanges {
         record_changes: record_changes?,
     })
+}
+
+#[substreams::handlers::map]
+pub fn parse_offchain_data(
+    content: OffchainDataContent,
+) -> Result<OffchainDataRecords, substreams::errors::Error> {
+    match parser::parse_content(&content) {
+        Ok(v) => Ok(v),
+        Err(_) => Ok(OffchainDataRecords {
+            uri: content.uri,
+            manifest: content.manifest,
+            records: Vec::new(),
+        }),
+    }
 }
 
 fn get_post_id(profile_id: &BigInt, pub_id: &BigInt) -> String {

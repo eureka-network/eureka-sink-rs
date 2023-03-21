@@ -19,14 +19,15 @@ fn main() {
     }
     downloader.exec().unwrap();
 
+    let mut protos = PROTOS
+        .iter()
+        .map(|proto| format!("{}/{}", PROTO_DST, proto))
+        .collect::<Vec<_>>();
+    protos.push("../proto/eureka/ingest/v1/records.proto".to_string());
+
     tonic_build::configure()
+        .protoc_arg("--experimental_allow_proto3_optional")
         .build_client(true)
-        .compile(
-            &PROTOS
-                .iter()
-                .map(|proto| format!("{}/{}", PROTO_DST, proto))
-                .collect::<Vec<_>>(),
-            &[PROTO_DST],
-        )
+        .compile(&protos, &[PROTO_DST, "../proto"])
         .unwrap();
 }

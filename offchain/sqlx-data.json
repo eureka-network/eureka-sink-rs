@@ -1,0 +1,115 @@
+{
+  "db": "PostgreSQL",
+  "2a3de60938a2a6c10e593587b96d4e6c0f4cc7fa8f85b2074b9d120971e73843": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE resolver_tasks SET num_retries = $1 WHERE uri = $2 AND manifest = $3"
+  },
+  "3f6a7278e1f48ad02f85648f34146ea4bfbac44050378da6f13b0952eb5bbc6e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "uri",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "manifest",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "handler",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "max_retries",
+          "ordinal": 3,
+          "type_info": "Int4"
+        },
+        {
+          "name": "wait_before_retry",
+          "ordinal": 4,
+          "type_info": "Int4"
+        },
+        {
+          "name": "num_retries",
+          "ordinal": 5,
+          "type_info": "Int4"
+        },
+        {
+          "name": "state",
+          "ordinal": 6,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "SELECT uri, manifest, handler, max_retries, wait_before_retry, num_retries, state FROM resolver_tasks WHERE state = $1"
+  },
+  "714b136eb82c3b6dba8d883aadb8f88f80ab6630334087576c36137d9eb99a36": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text",
+          "Int4",
+          "Int4",
+          "Int4",
+          "Int4"
+        ]
+      }
+    },
+    "query": "INSERT INTO resolver_tasks (uri, manifest, handler, max_retries, wait_before_retry, num_retries, state) VALUES ($1, $2, $3, $4, $5, $6, $7)"
+  },
+  "90df2e105d367bfc2ac83d33e2e204730dba81c875500d40c1edc5c910414a30": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE resolver_tasks SET state = $1 WHERE uri = $2 AND manifest = $3"
+  },
+  "b000803ce924f2439d0375bf799fb1b45372d5f7395c53d70e64d638fc601de1": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "CREATE TABLE IF NOT EXISTS resolver_tasks\n            (\n                uri               TEXT,\n                manifest          TEXT,\n                handler           TEXT,\n                max_retries       INTEGER,\n                wait_before_retry INTEGER,\n                num_retries       INTEGER,\n                state             INTEGER,\n                PRIMARY KEY (uri, manifest)\n            )"
+  }
+}

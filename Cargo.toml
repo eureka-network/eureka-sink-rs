@@ -3,6 +3,7 @@ members = [
     "bin/node/cli",
     "eureka-sink-postgres/db",
     "substreams-sink",
+    "offchain",
 ]
 
 [profile.release]

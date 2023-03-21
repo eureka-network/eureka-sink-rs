@@ -1,5 +1,6 @@
 use crate::operation::Operation;
 use crate::{error::DBError, sql_types::ColumnType};
+use diesel::connection::SimpleConnection;
 use diesel::{sql_query, Connection, PgConnection, QueryableByName, RunQueryDsl};
 use std::{
     collections::{HashMap, HashSet},
@@ -272,15 +273,15 @@ impl DBLoader {
     /// Given a a file path, assumed to be of .sql extension, it executes all queries
     /// in that file. The goal is to create, if necessary, all necessary tables in the
     /// schema. It also sets up a [`cursors`] table.
-    pub fn setup_schema(&mut self, setup_file: PathBuf) -> Result<usize, DBError> {
+    pub fn setup_schema(&mut self, setup_file: PathBuf) -> Result<(), DBError> {
         let setup_query =
             std::fs::read_to_string(setup_file).map_err(|e| DBError::InvalidSchemaPath(e))?;
-        let count = sql_query(setup_query)
-            .execute(self.connection())
+        self.connection()
+            .batch_execute(&setup_query)
             .map_err(|e| DBError::DieselError(e))?;
         // set a cursors table, as well
         self.set_up_cursor_table()?;
-        Ok(count)
+        Ok(())
     }
 
     /// Given a table name, it outputs its primary key column name
@@ -304,7 +305,6 @@ impl DBLoader {
             self.schema.clone(),
             table
         );
-
 
         let primary_keys = sql_query(query)
             .load::<PrimaryKey>(self.connection())

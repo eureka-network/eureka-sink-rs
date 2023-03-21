@@ -33,6 +33,7 @@ message Value {
     bytes bytes = 8;
     bool bool = 9;
     Array array = 10;
+    OffchainData offchaindata = 11;
   }
 }
 
@@ -44,4 +45,28 @@ message Field {
   string name = 1;
   optional Value new_value = 3;
   optional Value old_value = 5;
+}
+
+message OffchainData {
+    string uri = 1;
+    string handler = 2;
+    int32 max_retries = 3;
+    int32 wait_before_retry = 4;
+}
+
+message OffchainDataContent {
+    string uri = 1;
+    string manifest = 2;
+    string content = 3;
+}
+
+message OffchainDataRecords {
+  string uri = 1;
+  string manifest = 2;
+  repeated OffchainDataRecord records = 3;
+}
+
+message OffchainDataRecord {
+  string record = 1;
+  repeated Field fields = 2;
 }
