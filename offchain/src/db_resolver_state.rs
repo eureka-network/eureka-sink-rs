@@ -42,9 +42,9 @@ impl ResolverState for DBResolverState {
         let mut rows = sqlx::query!("SELECT uri, manifest, handler, max_retries, wait_before_retry, num_retries, state FROM resolver_tasks WHERE state = $1", TaskState::Queued.int_value())
         .fetch(&mut connection);
 
-        let mut tq = DelayQueue::new();
+        let mut task_queue = DelayQueue::new();
         while let Some(row) = rows.as_mut().try_next().await? {
-            tq.insert(
+            task_queue.insert(
                 ResolveTask {
                     manifest: row.manifest,
                     request: OffchainData {
@@ -58,7 +58,7 @@ impl ResolverState for DBResolverState {
                 Duration::ZERO,
             );
         }
-        Ok(tq)
+        Ok(task_queue)
     }
 
     async fn add_task(&mut self, task: &ResolveTask) -> Result<()> {
