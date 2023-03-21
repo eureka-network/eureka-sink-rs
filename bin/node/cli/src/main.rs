@@ -22,7 +22,7 @@ use substreams_sink::{
 };
 use tokio_stream::StreamExt;
 
-const DOMAIN_SEPARATION_LABEL: &str = "PRIMARY_KEY_INSERT_INTO";
+const DOMAIN_SEPARATION_LABEL: &str = "bin.node.cli.PRIMARY_KEY_INSERT_INTO";
 
 #[derive(Parser)]
 #[clap(author, version, about)]
