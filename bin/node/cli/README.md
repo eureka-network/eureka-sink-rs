@@ -5,8 +5,7 @@ Eureka CLI
 ## Building
 
 requirements
-- `libpq` for Diesel Postgres
--
+- `libpq` for Diesel Postgres // todo: add installation instructions
 
 run 
 ```
