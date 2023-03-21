@@ -47,7 +47,7 @@ impl ResolveTask {
 /// Link resolver
 #[async_trait]
 pub trait LinkResolver: Send + Sync + 'static {
-    async fn download(&self, uri: &str) -> Result<Vec<u8>>;
+    async fn download(&mut self, uri: &str) -> Result<Vec<u8>>;
 }
 
 /// Resolver state
@@ -127,7 +127,7 @@ impl Resolver {
                 let mut downloader = None;
                 let uri = task.request.uri.parse::<Uri>()?;
                 if let Some(protocol) = uri.scheme() {
-                    if let Some(d) = self.downloaders.get(protocol.as_str()) {
+                    if let Some(d) = self.downloaders.get_mut(protocol.as_str()) {
                         downloader = Some(d);
                     }
                 }
