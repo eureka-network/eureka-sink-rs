@@ -11,40 +11,16 @@ const U256_BYTES: usize = 32;
 #[derive(Clone)]
 #[allow(dead_code)]
 pub struct EncodedLog {
-    tx_index: u32,
-    tx_hash: Vec<u8>,
-    log_index: u32,
-    address: U256,
-    topics: Vec<U256>,
-    data: Vec<U256>,
-    goldilock_encoding: Vec<F>,
+    pub tx_index: u32,
+    pub tx_hash: Vec<u8>,
+    pub log_index: u32,
+    pub address: U256,
+    pub topics: Vec<U256>,
+    pub data: Vec<U256>,
+    pub goldilock_encoding: Vec<F>,
 }
 
 impl EncodedLog {
-    pub fn tx_index(&self) -> u32 {
-        self.tx_index
-    }
-
-    pub fn tx_hash(&self) -> Vec<u8> {
-        self.tx_hash.clone()
-    }
-
-    pub fn log_index(&self) -> u32 {
-        self.log_index
-    }
-
-    pub fn address(&self) -> U256 {
-        self.address
-    }
-
-    pub fn topics(&self) -> Vec<U256> {
-        self.topics.clone()
-    }
-
-    pub fn data(&self) -> Vec<U256> {
-        self.data.clone()
-    }
-
     pub fn field_encoding_address(&self) -> Vec<F> {
         // first two elements correspond to tx_index and log_index encoding,
         // every goldilock encoding of a `U256` has lenght 5

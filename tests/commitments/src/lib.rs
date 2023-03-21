@@ -48,20 +48,18 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
             .into_iter()
             .map(|log| {
                 let mut le_log_address = [0u8; 32];
-                log.address().to_little_endian(&mut le_log_address);
-
-                let log_topics = log.topics();
+                log.address.to_little_endian(&mut le_log_address);
 
                 let mut topic0 = [0u8; 32];
-                log_topics[0].to_little_endian(&mut topic0);
+                log.topics[0].to_little_endian(&mut topic0);
                 let mut topic1 = [0u8; 32];
-                log_topics[1].to_little_endian(&mut topic1);
+                log.topics[1].to_little_endian(&mut topic1);
                 let mut topic2 = [0u8; 32];
-                log_topics[2].to_little_endian(&mut topic2);
+                log.topics[2].to_little_endian(&mut topic2);
                 let mut topic3 = [0u8; 32];
-                log_topics[3].to_little_endian(&mut topic3);
+                log.topics[3].to_little_endian(&mut topic3);
                 let mut topic4 = [0u8; 32];
-                log_topics[4].to_little_endian(&mut topic4);
+                log.topics[4].to_little_endian(&mut topic4);
 
                 RecordChange {
                     record: "commmits".to_string(),
@@ -87,7 +85,7 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                             name: "txhash".to_string(),
                             new_value: Some(pb::Value {
                                 typed: Some(pb::value::Typed::String(
-                                    Hex(&log.tx_hash()).to_string(),
+                                    Hex(&log.tx_hash).to_string(),
                                 )),
                             }),
                             old_value: None,
@@ -95,14 +93,14 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                         Field {
                             name: "txindex".to_string(),
                             new_value: Some(pb::Value {
-                                typed: Some(pb::value::Typed::Uint32(log.tx_index())),
+                                typed: Some(pb::value::Typed::Uint32(log.tx_index)),
                             }),
                             old_value: None,
                         },
                         Field {
                             name: "logindex".to_string(),
                             new_value: Some(pb::Value {
-                                typed: Some(pb::value::Typed::Uint32(log.log_index())),
+                                typed: Some(pb::value::Typed::Uint32(log.log_index)),
                             }),
                             old_value: None,
                         },
@@ -155,7 +153,7 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                             new_value: Some(pb::Value {
                                 typed: Some(pb::value::Typed::String(
                                     Hex(&log
-                                        .data()
+                                        .data
                                         .iter()
                                         .flat_map(|u| {
                                             let mut slice = [0u8; 32];

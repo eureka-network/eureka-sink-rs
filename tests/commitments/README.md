@@ -17,6 +17,7 @@ This package will build a Poseidon tree for all events in an ethereum block.
 Requirements:
 - install `protoc` compiler (https://github.com/protocolbuffers/protobuf/releases) (for building manifest)
 - install or have `substreams` available
+- Plonky2 requires Rust nightly, so code nightly should be set on toolchain
 
 then build:
 -  the manifest to ingest block headers with
