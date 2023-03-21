@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 use tonic::codegen::http::uri::Uri;
 
 use crate::db_resolver_state::DBResolverState;
@@ -9,10 +6,10 @@ use crate::WasmParser;
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::StreamExt;
-use sqlx::PgPool;
-use tokio_util::time::delay_queue::DelayQueue;
 use int_enum::IntEnum;
-use substreams_sink::{OffchainData};
+use sqlx::PgPool;
+use substreams_sink::OffchainData;
+use tokio_util::time::delay_queue::DelayQueue;
 
 #[repr(i32)]
 #[derive(Copy, Clone, IntEnum)]
@@ -115,65 +112,58 @@ impl Resolver {
     }
 
     pub async fn run(&mut self, exit_on_completion: bool) -> Result<()> {
-        loop {
-            if exit_on_completion && self.queue.is_empty() {
-                break;
-            }
-
+        while !exit_on_completion || !self.queue.is_empty() {
             if let Some(mut expired) = self.queue.next().await {
                 let task = expired.get_mut();
                 debug!("processing task {} {}", task.request.uri, self.queue.len());
 
-                let mut downloader = None;
-                let uri = task.request.uri.parse::<Uri>()?;
-                if let Some(protocol) = uri.scheme() {
-                    if let Some(d) = self.downloaders.get_mut(protocol.as_str()) {
-                        downloader = Some(d);
-                    }
-                }
-                if downloader.is_none() {
-                    self.state
-                        .update_task_state(&task, TaskState::UnknownURI)
-                        .await?;
-                    debug!("no downloader for {}", task.request.uri);
-                    continue;
-                }
-
                 let parser = self.parsers.get_mut(&task.manifest);
-                if parser.is_none() {
-                    self.state
-                        .update_task_state(&task, TaskState::UnknownParser)
-                        .await?;
-                    debug!("no parser for {}", task.manifest);
-                    continue;
-                }
-
-                let new_state = match downloader.unwrap().download(&task.request.uri).await {
-                    Ok(bytes) => {
-                        if parser.unwrap().parse(&task, bytes).is_err() {
-                            TaskState::ParsingFailed
-                        } else {
-                            TaskState::Finished
-                        }
+                let downloader = {
+                    let uri = task.request.uri.parse::<Uri>()?;
+                    if let Some(protocol) = uri.scheme() {
+                        self.downloaders.get_mut(protocol.as_str())
+                    } else {
+                        None
                     }
-                    Err(_) => match task.increment_try_counter() {
-                        true => {
-                            trace!(
-                                "scheduling retry {} {}",
-                                task.num_retries,
-                                task.request.max_retries
-                            );
-                            self.state.update_retry_counter(&task).await?;
-                            self.queue.insert(
-                                task.clone(),
-                                Duration::from_secs(task.request.wait_before_retry as u64),
-                            );
-                            TaskState::Queued
-                        }
-                        false => TaskState::DownloadFailed,
-                    },
                 };
-                self.state.update_task_state(&task, new_state).await?;
+                match (downloader, parser) {
+                    (Some(downloader), Some(parser)) => {
+                        let new_state = match downloader.download(&task.request.uri).await {
+                            Ok(bytes) => {
+                                if parser.parse(&task, bytes).is_err() {
+                                    TaskState::ParsingFailed
+                                } else {
+                                    TaskState::Finished
+                                }
+                            }
+                            Err(_) => match task.increment_try_counter() {
+                                true => {
+                                    trace!(
+                                        "scheduling retry {} {}",
+                                        task.num_retries,
+                                        task.request.max_retries
+                                    );
+                                    self.state.update_retry_counter(&task).await?;
+                                    self.queue.insert(
+                                        task.clone(),
+                                        Duration::from_secs(task.request.wait_before_retry as u64),
+                                    );
+                                    TaskState::Queued
+                                }
+                                false => TaskState::DownloadFailed,
+                            },
+                        };
+                        self.state.update_task_state(&task, new_state).await?;
+                    }
+                    (None, _) => {
+                        debug!("no downloader for {}", task.request.uri);
+                        continue;
+                    }
+                    (_, None) => {
+                        debug!("no parser for {} {}", task.request.uri, task.manifest);
+                        continue;
+                    }
+                }
             }
         }
         Ok(())
