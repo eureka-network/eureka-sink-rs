@@ -19,7 +19,7 @@ impl ArweaveLinkResolver {
 
 #[async_trait]
 impl LinkResolver for ArweaveLinkResolver {
-    async fn download(&self, uri: &str) -> Result<Vec<u8>> {
+    async fn download(&mut self, uri: &str) -> Result<Vec<u8>> {
         let parsed_uri = uri.parse::<Uri>()?;
         let id = parsed_uri
             .host()

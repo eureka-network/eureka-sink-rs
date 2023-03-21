@@ -14,7 +14,7 @@ use eureka_sink_postgres::{
 };
 use hex::encode;
 
-use offchain::{HTTPSLinkResolver, ArweaveLinkResolver, Resolver};
+use offchain::{ArweaveLinkResolver, HTTPSLinkResolver, IpfsLinkResolver, Resolver};
 use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
 use substreams_sink::pb;
 use substreams_sink::{
@@ -62,6 +62,9 @@ struct Config {
     /// SQL Schema file name (*.sql)
     #[clap(long)]
     schema_file_name: String,
+    /// IPFS clients
+    #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
+    ipfs_clients: Vec<String>,
 }
 
 #[tokio::main]
@@ -128,11 +131,6 @@ async fn main() {
             "ar".to_string(),
             Box::new(ArweaveLinkResolver::new().expect("failed to create HTTP client")),
         )
-        /* todo:: enable
-        .with_link_resolver(
-            "ipfs".to_string(),
-            Box::new(IPFSLinkResolver::new().expect("failed to create IPFS client")),
-        ) */
         .with_parser(
             config.schema.clone(),
             client
@@ -140,6 +138,15 @@ async fn main() {
                 .expect("Failed to load manifest binary"),
         )
         .expect("Failed to create wasm vm");
+
+    if config.ipfs_clients.len() > 0 {
+        resolver = resolver.with_link_resolver(
+            "ipfs".to_string(),
+            Box::new(
+                IpfsLinkResolver::new(&config.ipfs_clients).expect("failed to create IPFS client"),
+            ),
+        );
+    }
 
     let mut stream = client
         .get_stream(

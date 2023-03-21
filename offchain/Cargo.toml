@@ -19,3 +19,4 @@ futures = "0.3.24"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 int-enum = "0.5"
 substreams-sink = { path = "../substreams-sink" }
+ipfs-api = { version = "0.17.0", features = ["with-hyper-rustls"], default-features = false }
