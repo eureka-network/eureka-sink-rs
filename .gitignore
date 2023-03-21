@@ -7,3 +7,6 @@ test-v0.1.0.spkg
 #rust
 Cargo.lock
 target
+
+# osx
+.DS_Store
