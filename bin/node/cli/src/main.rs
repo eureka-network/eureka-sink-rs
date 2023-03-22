@@ -280,8 +280,8 @@ async fn main() {
             Message::DebugSnapshotData(_) => {
                 println!("FLAG:    DebugSnapshotData")
             }
-            Message::Progress(_) => {
-                println!("FLAG:    Progress")
+            Message::Progress(data) => {
+                println!("FLAG:    Progress {:?}", data.modules)
             }
             Message::Session(_) => {
                 println!("FLAG:    Session")

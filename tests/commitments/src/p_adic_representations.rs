@@ -9,7 +9,7 @@ pub(crate) fn goldilocks_adic_representation(x: U256) -> [F; 5] {
     let mut value = x;
     for i in 0..result.len() {
         let (q, r) = value.div_mod(F::ORDER.into());
-        // we know that remainder < ORDER < MAXu64
+        // we know that remainder < ORDER < u64::MAX
         result[i] = F::from_canonical_u64(r.low_u64());
         value = q;
     }

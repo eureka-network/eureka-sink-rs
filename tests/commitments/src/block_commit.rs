@@ -126,12 +126,21 @@ impl BlockCommitment {
 
         // todo: first borrow logs to make merkle tree, then move to self
         if !self.encoded_logs.is_empty() {
-            self.events_commitment = Some(EventsCommitment::new(
-                self.encoded_logs
-                    .iter()
-                    .map(|l| l.goldilock_encoding.clone())
-                    .collect(),
-            ));
+            // TODO: for now we make sure the lenght of the array is a power of 2,
+            // by extending it with zeroes, but this is not a good approach as it
+            // is not otimized and not secure
+            //
+            // we know that self.encoded_logs.len() != 0
+            let log_2_len = self.encoded_logs.len().ilog2() + 1;
+            let diff = 2_u64.pow(log_2_len) - self.encoded_logs.len() as u64;
+
+            let mut extended_events_commitment = vec![vec![F::ZERO]; diff as usize];
+            let _ = self
+                .encoded_logs
+                .iter()
+                .for_each(|l| extended_events_commitment.push(l.goldilock_encoding.clone()));
+
+            self.events_commitment = Some(EventsCommitment::new(extended_events_commitment));
         }
 
         Ok(())
