@@ -7,6 +7,7 @@ use clap_serde_derive::{
     ClapSerde,
 };
 use eureka_sink_postgres::{
+    cursor::CursorLoader,
     db_loader::DBLoader,
     flush::FlushLoader,
     ops::DBLoaderOperations,
@@ -148,12 +149,22 @@ async fn main() {
         );
     }
 
+    let cursor = db_loader
+        .get_cursor(config.module_name.clone())
+        .or::<Cursor>(Ok(Cursor {
+            cursor: "".to_string(),
+            block: BlockRef {
+                id: config.start_block.to_string(),
+                num: u64::try_from(config.start_block).expect("Invalid start block"),
+            },
+        }))
+        .expect("Failed to get cursor");
     let mut stream = client
         .get_stream(
             &config.module_name,
             config.start_block,
             config.end_block,
-            "",
+            &cursor.cursor,
             "STEP_IRREVERSIBLE",
         )
         .await
@@ -209,21 +220,18 @@ async fn main() {
                                                 }
                                             };
                                             data.insert(col_name.clone(), new_value);
-                                            let typed = field
+                                            if let pb::value::Typed::Offchaindata(request) = field
                                                 .new_value
                                                 .as_ref()
                                                 .unwrap()
                                                 .typed
                                                 .to_owned()
-                                                .unwrap();
-                                            match typed {
-                                                pb::value::Typed::Offchaindata(request) => {
-                                                    resolver
-                                                        .add_task(&config.schema, request)
-                                                        .await
-                                                        .expect("Failed to add task.");
-                                                }
-                                                _ => {}
+                                                .unwrap()
+                                            {
+                                                resolver
+                                                    .add_task(&config.schema, request)
+                                                    .await
+                                                    .expect("Failed to add task.");
                                             }
                                         }
                                         db_loader

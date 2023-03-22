@@ -119,21 +119,26 @@ impl Resolver {
 
                 let parser = self.parsers.get_mut(&task.manifest);
                 let downloader = {
-                    let uri = task.request.uri.parse::<Uri>()?;
-                    if let Some(protocol) = uri.scheme() {
-                        self.downloaders.get_mut(protocol.as_str())
-                    } else {
-                        None
+                    match task.request.uri.parse::<Uri>() {
+                        Ok(uri) => {
+                            if let Some(protocol) = uri.scheme() {
+                                self.downloaders.get_mut(protocol.as_str())
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_) => None,
                     }
                 };
-                match (downloader, parser) {
+                use TaskState::*;
+                let new_state = match (downloader, parser) {
                     (Some(downloader), Some(parser)) => {
-                        let new_state = match downloader.download(&task.request.uri).await {
+                        match downloader.download(&task.request.uri).await {
                             Ok(bytes) => {
                                 if parser.parse(&task, bytes).is_err() {
-                                    TaskState::ParsingFailed
+                                    ParsingFailed
                                 } else {
-                                    TaskState::Finished
+                                    Finished
                                 }
                             }
                             Err(_) => match task.increment_try_counter() {
@@ -148,22 +153,16 @@ impl Resolver {
                                         task.clone(),
                                         Duration::from_secs(task.request.wait_before_retry as u64),
                                     );
-                                    TaskState::Queued
+                                    Queued
                                 }
-                                false => TaskState::DownloadFailed,
+                                false => DownloadFailed,
                             },
-                        };
-                        self.state.update_task_state(&task, new_state).await?;
+                        }
                     }
-                    (None, _) => {
-                        debug!("no downloader for {}", task.request.uri);
-                        continue;
-                    }
-                    (_, None) => {
-                        debug!("no parser for {} {}", task.request.uri, task.manifest);
-                        continue;
-                    }
-                }
+                    (None, _) => UnknownURI,
+                    (_, None) => UnknownParser,
+                };
+                self.state.update_task_state(&task, new_state).await?;
             }
         }
         Ok(())
