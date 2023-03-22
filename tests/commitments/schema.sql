@@ -14,6 +14,5 @@ create table if not exists ethereummainnet.eth_events (
     data        text,
     addressF    text,
     commitment  text,
-    num_logs    integer,
-    num_encoded_logs integer
+    num_logs    integer
 );

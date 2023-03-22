@@ -132,9 +132,12 @@ impl BlockCommitment {
             //
             // we know that self.encoded_logs.len() != 0
             let log_2_len = self.encoded_logs.len().ilog2() + 1;
-            let diff = 2_u64.pow(log_2_len) - self.encoded_logs.len() as u64;
+            let diff = 2_u64.pow(log_2_len) - self.encoded_logs.len() as u64 - 1;
 
             let mut extended_events_commitment = vec![vec![F::ZERO]; diff as usize];
+            // prepend with goldilocks_encoding length
+            extended_events_commitment
+                .push(vec![F::from_canonical_u64(self.encoded_logs.len() as u64)]);
             let _ = self
                 .encoded_logs
                 .iter()
