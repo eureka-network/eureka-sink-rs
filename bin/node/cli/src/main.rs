@@ -68,7 +68,7 @@ struct Config {
     ipfs_clients: Vec<String>,
     /// Resolver offchain data
     #[clap(short, long, default_value = "false")]
-    resolver_offchain_data: bool,
+    resolve_offchain_data: bool,
 }
 
 #[tokio::main]
@@ -125,7 +125,7 @@ async fn main() {
         .unwrap();
 
     let mut resolver: Option<Resolver> = None;
-    if config.resolver_offchain_data {
+    if config.resolve_offchain_data {
         resolver = Some(
             Resolver::new(&config.postgres_dsn)
                 .await
