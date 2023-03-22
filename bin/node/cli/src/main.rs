@@ -66,6 +66,9 @@ struct Config {
     /// IPFS clients
     #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
     ipfs_clients: Vec<String>,
+    /// Resolver offchain data
+    #[clap(short, long, default_value = "false")]
+    resolver_offchain_data: bool,
 }
 
 #[tokio::main]
@@ -121,32 +124,40 @@ async fn main() {
         .await
         .unwrap();
 
-    let mut resolver = Resolver::new(&config.postgres_dsn)
-        .await
-        .expect("Failed to connect DB state")
-        .with_link_resolver(
-            "https".to_string(),
-            Box::new(HTTPSLinkResolver::new().expect("failed to create HTTP client")),
-        )
-        .with_link_resolver(
-            "ar".to_string(),
-            Box::new(ArweaveLinkResolver::new().expect("failed to create HTTP client")),
-        )
-        .with_parser(
-            config.schema.clone(),
-            client
-                .get_binary(&config.module_name)
-                .expect("Failed to load manifest binary"),
-        )
-        .expect("Failed to create wasm vm");
-
-    if config.ipfs_clients.len() > 0 {
-        resolver = resolver.with_link_resolver(
-            "ipfs".to_string(),
-            Box::new(
-                IpfsLinkResolver::new(&config.ipfs_clients).expect("failed to create IPFS client"),
-            ),
+    let mut resolver: Option<Resolver> = None;
+    if config.resolver_offchain_data {
+        resolver = Some(
+            Resolver::new(&config.postgres_dsn)
+                .await
+                .expect("Failed to connect DB state")
+                .with_link_resolver(
+                    "https".to_string(),
+                    Box::new(HTTPSLinkResolver::new().expect("failed to create HTTP client")),
+                )
+                .with_link_resolver(
+                    "ar".to_string(),
+                    Box::new(ArweaveLinkResolver::new().expect("failed to create HTTP client")),
+                )
+                .with_parser(
+                    config.schema.clone(),
+                    client
+                        .get_binary(&config.module_name)
+                        .expect("Failed to load manifest binary"),
+                )
+                .expect("Failed to create wasm vm"),
         );
+
+        if config.ipfs_clients.len() > 0 {
+            resolver = resolver.map(|resolver| {
+                resolver.with_link_resolver(
+                    "ipfs".to_string(),
+                    Box::new(
+                        IpfsLinkResolver::new(&config.ipfs_clients)
+                            .expect("failed to create IPFS client"),
+                    ),
+                )
+            });
+        }
     }
 
     let cursor = db_loader
@@ -228,10 +239,13 @@ async fn main() {
                                                 .to_owned()
                                                 .unwrap()
                                             {
-                                                resolver
-                                                    .add_task(&config.schema, request)
-                                                    .await
-                                                    .expect("Failed to add task.");
+                                                match resolver {
+                                                    Some(ref mut r) => r
+                                                        .add_task(&config.schema, request)
+                                                        .await
+                                                        .expect("Failed to add task."),
+                                                    None => (),
+                                                }
                                             }
                                         }
                                         db_loader
@@ -261,8 +275,10 @@ async fn main() {
             _ => {}
         }
     }
-    info!("Resolving offchain content...");
-    resolver.run(true).await.expect("failed to run resolver");
+    resolver.map(|mut resolver| async move {
+        info!("Resolving offchain content...");
+        resolver.run(true).await.expect("failed to run resolver");
+    });
 }
 
 fn decode<T: std::default::Default + prost::Message>(
