@@ -6,5 +6,5 @@ end_block = 40141203
 postgres_dsn = "postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable"
 schema_file_name = "./schema.sql"
 schema = "polygonmainnet"
-ipfs_clients = ["http://127.0.0.1:5001"]
-resolve_offchain_data = "true"
+ipfs_clients = "http://127.0.0.1:5001"
+resolve_offchain_data = true

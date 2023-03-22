@@ -62,7 +62,7 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                 log.topics[4].to_little_endian(&mut topic4);
 
                 RecordChange {
-                    record: "commmits".to_string(),
+                    record: "eth_events".to_string(),
                     id: format!("{}<{}>", DOMAIN_SEPARATION_LABEL, Hex(&block.hash)),
                     operation: pb::record_change::Operation::Create.into(),
                     ordinal: 0,

@@ -261,7 +261,9 @@ async fn main() {
                                 }
                             }
                         }
-                        _ => {}
+                        _ => {
+                            println!("FLAG:     HERREEEE");
+                        }
                     }
                     // todo: flush is now per module output; it might make more sense per block?
                     match db_loader.flush(output.name, cursor.clone()) {
@@ -272,7 +274,18 @@ async fn main() {
                 // todo: can we flush here per block?
                 // db_loader.flush()
             }
-            _ => {}
+            Message::DebugSnapshotComplete(_) => {
+                println!("FLAG:    DebugSnapshotComplete")
+            }
+            Message::DebugSnapshotData(_) => {
+                println!("FLAG:    DebugSnapshotData")
+            }
+            Message::Progress(_) => {
+                println!("FLAG:    Progress")
+            }
+            Message::Session(_) => {
+                println!("FLAG:    Session")
+            }
         }
     }
     resolver.map(|mut resolver| async move {
