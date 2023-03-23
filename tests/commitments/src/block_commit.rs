@@ -1,11 +1,10 @@
 use anyhow::anyhow;
-use ethereum_types::U256;
 use plonky2::field::types::Field;
-use plonky2::hash::poseidon::PoseidonHash;
+use plonky2::hash::{hash_types::HashOut, poseidon::PoseidonHash};
 use plonky2::plonk::config::{GenericHashOut, Hasher};
 use substreams_ethereum::pb::eth::v2 as pb;
 
-use crate::{p_adic_representations::goldilocks_adic_representation, EventsCommitment, F};
+use crate::{p_adic_representations::goldilocks_adic_representation, EventsCommitment, F, U256};
 const U256_BYTES: usize = 32;
 
 #[derive(Clone)]
@@ -45,6 +44,14 @@ impl BlockCommitment {
 
     pub fn encoded_logs(&self) -> Vec<EncodedLog> {
         self.encoded_logs.clone()
+    }
+
+    pub fn encoded_events_commitment_root(&self) -> Option<HashOut<F>> {
+        if let Some(ref events_commitment) = self.events_commitment {
+            let poseidon_tree = events_commitment.get_inner();
+            return Some(poseidon_tree.cap.0[0]);
+        }
+        None
     }
 
     pub fn events_commitment_root(&self) -> Vec<u8> {
@@ -129,23 +136,35 @@ impl BlockCommitment {
             // TODO: for now we make sure the lenght of the array is a power of 2,
             // by extending it with zeroes, but this is not a good approach as it
             // is not otimized and not secure
-            //
-            // we know that self.encoded_logs.len() != 0
-            let log_2_len = self.encoded_logs.len().ilog2() + 1;
-            let diff = 2_u64.pow(log_2_len) - self.encoded_logs.len() as u64 - 1;
-
-            let mut extended_events_commitment = vec![vec![F::ZERO]; diff as usize];
-            // prepend with goldilocks_encoding length
-            extended_events_commitment
-                .push(vec![F::from_canonical_u64(self.encoded_logs.len() as u64)]);
-            let _ = self
+            let events_commitment = self
                 .encoded_logs
                 .iter()
-                .for_each(|l| extended_events_commitment.push(l.goldilock_encoding.clone()));
+                .map(|l| l.goldilock_encoding.clone())
+                .collect::<Vec<Vec<F>>>();
 
+            let extended_events_commitment = extend_leaves_to_pow_2(events_commitment);
             self.events_commitment = Some(EventsCommitment::new(extended_events_commitment));
         }
 
         Ok(())
     }
+}
+
+fn extend_leaves_to_pow_2(values: Vec<Vec<F>>) -> Vec<Vec<F>> {
+    if values.len() == 0 {
+        return vec![];
+    }
+    // we know that self.encoded_logs.len() != 0
+    let log_2_len = values.len().ilog2() + 1;
+    let diff = 2_u64.pow(log_2_len) - values.len() as u64 - 1;
+
+    let mut extended_events_commitment = values;
+
+    // append with goldilocks_encoding length
+    extended_events_commitment.push(vec![F::from_canonical_u64(
+        extended_events_commitment.len() as u64,
+    )]);
+
+    extended_events_commitment.extend(vec![vec![F::ZERO]; diff as usize]);
+    extended_events_commitment
 }
