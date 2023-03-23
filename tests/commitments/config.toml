@@ -1,8 +1,9 @@
 firehose_endpoint = "https://mainnet.eth.streamingfast.io:443"
-package_file_name = "./eth-events-commitment-v0.1.0.spkg"
-module_name = "commit_events"
-start_block = 100
-end_block = 10000
+package_file_name = "./eth-extract-events-v0.1.0.spkg"
+module_name = "extract_events"
+start_block = 2000000
+end_block = 2001000
 postgres_dsn = "postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable"
 schema_file_name = "./schema.sql"
 schema = "ethereummainnet"
+resolve_offchain_data = false
