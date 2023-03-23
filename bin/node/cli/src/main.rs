@@ -239,12 +239,10 @@ async fn main() {
                                                 .to_owned()
                                                 .unwrap()
                                             {
-                                                match resolver {
-                                                    Some(ref mut r) => r
-                                                        .add_task(&config.schema, request)
+                                                if let Some(ref mut r) = resolver {
+                                                    r.add_task(&config.schema, request)
                                                         .await
-                                                        .expect("Failed to add task."),
-                                                    None => (),
+                                                        .expect("Failed to add task.");
                                                 }
                                             }
                                         }
@@ -261,9 +259,7 @@ async fn main() {
                                 }
                             }
                         }
-                        _ => {
-                            println!("FLAG:     HERREEEE");
-                        }
+                        _ => {}
                     }
                     // todo: flush is now per module output; it might make more sense per block?
                     match db_loader.flush(output.name, cursor.clone()) {
@@ -274,18 +270,7 @@ async fn main() {
                 // todo: can we flush here per block?
                 // db_loader.flush()
             }
-            Message::DebugSnapshotComplete(_) => {
-                println!("FLAG:    DebugSnapshotComplete")
-            }
-            Message::DebugSnapshotData(_) => {
-                println!("FLAG:    DebugSnapshotData")
-            }
-            Message::Progress(data) => {
-                println!("FLAG:    Progress {:?}", data.modules)
-            }
-            Message::Session(_) => {
-                println!("FLAG:    Session")
-            }
+            _ => {}
         }
     }
     resolver.map(|mut resolver| async move {

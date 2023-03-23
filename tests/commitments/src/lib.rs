@@ -44,7 +44,6 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
 
     let num_logs = block.logs().map(|x| x).collect::<Vec<_>>().len();
     let encoded_logs = block_commitment.encoded_logs();
-    let num_encoded_logs = encoded_logs.len().try_into().unwrap();
 
     let mut record_changes = vec![];
 
@@ -108,13 +107,6 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                 name: "logindex".to_string(),
                 new_value: Some(pb::Value {
                     typed: Some(pb::value::Typed::Uint32(log.log_index)),
-                }),
-                old_value: None,
-            },
-            Field {
-                name: "num_encoded_logs".to_string(),
-                new_value: Some(pb::Value {
-                    typed: Some(pb::value::Typed::Uint64(num_encoded_logs)),
                 }),
                 old_value: None,
             },
