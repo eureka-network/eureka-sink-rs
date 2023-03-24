@@ -158,13 +158,12 @@ fn extend_leaves_to_pow_2(values: Vec<Vec<F>>) -> Vec<Vec<F>> {
     let log_2_len = values.len().ilog2() + 1;
     let diff = 2_u64.pow(log_2_len) - values.len() as u64 - 1;
 
-    let mut extended_events_commitment = values;
-
-    // append with goldilocks_encoding length
-    extended_events_commitment.push(vec![F::from_canonical_u64(
-        extended_events_commitment.len() as u64,
-    )]);
-
+    // prepend len of values
+    let mut extended_events_commitment = vec![vec![F::from_canonical_u64(values.len() as u64)]];
+    // extend with values
+    extended_events_commitment.extend(values);
+    // extend with vec![F(0)] to get to a power of 2 len vector
     extended_events_commitment.extend(vec![vec![F::ZERO]; diff as usize]);
+
     extended_events_commitment
 }

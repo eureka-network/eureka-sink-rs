@@ -31,11 +31,19 @@ const D: usize = 2;
 pub type F = GoldilocksField;
 pub type Digest = [F; 4];
 
-pub struct EventsCommitment(pub MerkleTree<F, PoseidonHash>);
+// todo: we changed this to include encoded logs; update code elsewhere
+// reason: we need events to be hashed as one atomic unit before adding to the tree
+pub struct EventsCommitment {
+    pub merkle_tree: Option(MerkleTree<F, PoseidonHash>),
+    pub encoded_logs: Vec<EncodedLog>,
+};
 
 impl EventsCommitment {
-    fn new(data: Vec<Vec<F>>) -> Self {
-        Self(MerkleTree::new(data, 0))
+    fn new(data: Vec<EncodedLog>) -> Self {
+        Self(
+            merkle_tree: None,
+            encoded_logs: data
+        )
     }
 
     pub fn tree_height(&self) -> usize {
@@ -195,9 +203,18 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
     Ok(RecordChanges { record_changes })
 }
 
+/// The current function aim is to build a circuit to check event selection
+/// from a specific address (addr). We need to verify the following steps:
+///
+/// 1. Loop over k encoded events (encoded as `Vec<F>`); and compute the following:
+///    1.a. which events select for the address
+/// 2. For each event, `e`, check if `is_equal(e.address[j]`, addr[j])` for j=2..7 the address elements
+/// 3. build the merkle trie of all the encoded events, and assert it is equal to PI `C_n`
+/// 4.
 fn select_address_events_over_logs(
-    encoded_logs: Vec<EncodedLog>,
-    root: HashOut<F>,
+    encoded_logs: Vec<Vec<F>>,
+    pi_root: HashOut<F>,
+    pi_select_address: [F; 5],
     commitment_tree: MerkleTree<F, PoseidonHash>,
 ) -> Result<CircuitBuilder<F, D>, anyhow::Error> {
     // let's try to select events based on address
@@ -223,12 +240,14 @@ fn select_address_events_over_logs(
     // builder, as targets
     for (leaf_index, encoded_log) in encoded_logs.iter().enumerate() {
         let current_event_address = encoded_log.address;
+        // add virtual targets for current event address
+        let current_event_address_targets = circuit_builder.add_virtual_targets(5_usize);
         if select_address == current_event_address {
-            // add virtual targets for current event address
-            let current_event_address_targets = circuit_builder.add_virtual_targets(5_usize);
+            // in the case of equality between addresses, register public inputs for the
+            // current event address targets
             circuit_builder.register_public_inputs(&current_event_address_targets);
             // for each byte, check equality in place
-            (0..4).for_each(|i| {
+            (0..5).for_each(|i| {
                 circuit_builder.connect(select_address_targets[i], current_event_address_targets[i])
             });
             // for selected events (i.e., addresses matching selected address), verify these
@@ -238,16 +257,91 @@ fn select_address_events_over_logs(
             if let Err(e) = verify_merkle_proof(
                 encoded_log.goldilock_encoding.clone(),
                 leaf_index,
-                root,
+                pi_root,
                 &proof,
             ) {
                 return Err(anyhow::anyhow!(
-                    "Failed to verify merkle proof for event with index {}",
-                    leaf_index
+                    "Failed to verify merkle proof for event with index {} with error {}",
+                    leaf_index,
+                    e
                 ));
             }
         }
     }
 
     Ok(circuit_builder)
+}
+
+fn circuit_select_address_events_over_logs(
+    builder: &mut CircuitBuilder,
+    events: Vec<EncodedLog>,
+    pi_events_root: HashOut<F>,
+    pi_select_address: Vec<F>,
+) -> (HashOut<F>, usize, Vec<EncodedLog>) {
+    // extract the length of the events vec
+    let k = events.len();
+
+    // specify 5 targets for `pi_select_address`
+    let select_address_targets = builder.add_virtual_targets(5_usize);
+
+    // precompute which events are selected
+    let mut selected_events = Vec<(usize, EncodedLog)>::new();
+    let mut unseleceted_events = Vec<(usize, EncodedLog)>::new();
+
+    // specify true bool targets for later usage
+    let truet = builder._true();
+
+    for (index, event) in events.enumerate() {
+        if event.field_encoding_address() == pi_select_address {
+            selected_events.push((index + 1, event));
+        } else {
+            unseleceted_events.push((index + 1, event));
+        }
+    }
+
+    // now prove that each selected event addresses matched on the original address
+    for (index, selected_event) in selected_events {
+        let select_event_address = selected_event.field_encoding_address();
+        // add the corresponding 5 targets to this event to the builder
+        let select_event_targets = builder.add_virtual_targets(5_usize);
+
+        // address is defined by 5 field elements, and they all need to equal the selection address
+        let mut bool_cummulative_target = builder.is_equal(select_address_targets[0], select_event_targets[0]);
+        for i in 1..5 {
+            let bool_target = builder.is_equal(select_address_targets[i], select_event_targets[i]);
+            bool_cummulative_target = builder.and(bool_cummulative_target, bool_target);
+        }
+        builder.connect(truet, bool_cummulative_target);
+    }
+    
+    // and we prove that for the not selected events the addresses do not match on the original address
+    for (index, unselected_event) in unseleceted_events {
+        let unselect_event_address = unselected_event.field_encoding_address();
+        // add the corresponding 5 targets to this event to the builder
+        let unselect_event_targets = builder.add_virtual_targets(5_usize);
+
+        // address is defined by 5 field elements, and combined they should not match the selection address
+        let mut bool_cummulative_target = builder.is_equal(select_address_targets[0], unselect_event_targets[0]);
+        for i in 1..5 {
+            let bool_target = builder.is_equal(select_address_targets[i], unselect_event_targets[i]);
+            bool_cummulative_target = builder.and(bool_cummulative_target, bool_target);
+        }
+        // assert that at least one of the 5 targets do not match 
+        let let_me_be_true = builder.not(bool_cummulative_target);
+        builder.connect(truet, bool_cummulative_target);
+    }
+
+
+    // build wires that connect `events` with `pi_events_root`
+
+    // register public inputs
+    builder.register_public_inputs(select_address_targets);
+
+
+    // todos:
+    // - build tree of all events
+    //   - connect root to PI pi_root C_n
+    //   - each event must be hashed before being put into the tree
+    // - build tree of the selected events
+    //   - connect the root to PI E_n
 }
