@@ -1,29 +1,35 @@
+use crate::{resolver::ResolveTask, ContentParser};
 use anyhow::{anyhow, Result};
 use futures::executor::block_on;
-use wasmer::{
-    imports, Cranelift, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store,
-};
-
-use crate::{resolver::ResolveTask, ContentParser};
 use int_enum::IntEnum;
 use prost::Message;
 use sqlx::{PgPool, Postgres, QueryBuilder};
 use substreams_sink::{pb, OffchainDataContent, OffchainDataRecord, OffchainDataRecords};
+use wasmer::{
+    imports, Cranelift, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store,
+};
 
+/// Wasm environment
 struct MyEnv {
     memory: Option<Memory>,
     connection_pool: PgPool,
 }
 
 /// Wasm parser
-pub struct WasmParser {
+pub struct Parser {
     store: Store,
     env: FunctionEnv<MyEnv>,
     _module: Module,
     instance: Instance,
 }
 
-impl WasmParser {
+impl Parser {
+    /// Create a new Parser
+    /// # Arguments
+    ///  * `code` - The WASM bytecode.
+    ///  * `connection_pool` - A connection pool to the database.
+    /// # Returns
+    /// * `Parser` - The WASM parser.
     pub fn new(code: &[u8], connection_pool: PgPool) -> Result<Self> {
         let mut store = Store::new(Cranelift::default());
         let env = FunctionEnv::new(
@@ -121,7 +127,12 @@ impl WasmParser {
         })
     }
 }
-impl ContentParser for WasmParser {
+
+impl ContentParser for Parser {
+    /// Parse the content
+    /// # Arguments
+    /// * `task` - The task to resolve.
+    /// * `content` - The content to parse.
     fn parse(&mut self, task: &ResolveTask, content: Vec<u8>) -> Result<()> {
         let content = OffchainDataContent {
             uri: task.request.uri.clone(),
@@ -129,6 +140,7 @@ impl ContentParser for WasmParser {
             content: String::from_utf8(content).expect("failed to decode content"),
         };
         let msg = content.encode_to_vec();
+        debug!("message len: {}", msg.len());
 
         let memory = self
             .env
@@ -155,6 +167,12 @@ impl ContentParser for WasmParser {
     }
 }
 
+/// Build a query from the record
+/// # Arguments
+/// * `manifest` - The manifest name.
+/// * `record` - The record to build the query from.
+/// # Returns
+/// * `QueryBuilder` - The query builder.
 fn build_query<'args>(
     manifest: &str,
     record: &'args OffchainDataRecord,
@@ -210,7 +228,7 @@ fn build_query<'args>(
             Typed::String(v) => {
                 bound.push_bind(v);
             }
-            _ => panic!("shouldn't get here"),
+            _ => unreachable!("filtered in the previous step"),
         };
     }
     bound.push_unseparated(")");

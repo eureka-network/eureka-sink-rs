@@ -15,13 +15,18 @@ use eureka_sink_postgres::{
 };
 use hex::encode;
 
-use offchain::{ArweaveLinkResolver, HTTPSLinkResolver, IpfsLinkResolver, Resolver};
-use std::{collections::HashMap, fs::File, io::Read, str::FromStr};
+use offchain::{
+    wasm, resolver, ArweaveLinkResolver, HTTPSLinkResolver, IpfsLinkResolver, LinkResolver, ResolveTask,
+    Resolver,
+};
+use sqlx::PgPool;
+use std::{collections::HashMap, fs::File, io::Read, str::FromStr, sync::Arc};
 use substreams_sink::pb;
 use substreams_sink::{
     pb::Value, substreams::pb::response::Message, BlockRef, Cursor, SubstreamsSink,
 };
 use tokio_stream::StreamExt;
+use anyhow::{anyhow, Result};
 
 const DOMAIN_SEPARATION_LABEL: &str = "bin.node.cli.PRIMARY_KEY_INSERT_INTO";
 
@@ -69,6 +74,9 @@ struct Config {
     /// Resolver offchain data
     #[clap(short, long, default_value = "false")]
     resolve_offchain_data: bool,
+    /// Maximum number of cuncurrent resolver tasks
+    #[clap(long, default_value = "48")]
+    max_concurrent_resolver_tasks: u64,
 }
 
 #[tokio::main]
@@ -99,6 +107,12 @@ async fn main() {
         return;
     }
 
+    if let Err(e) = run(config).await {
+        error!("Error: {}", e);
+    }
+}
+
+async fn run(config: Config) -> Result<()> {
     // create a [`DBLoader`] instance
     let mut db_loader = DBLoader::new(config.postgres_dsn.clone(), config.schema.clone())
         .expect("Failed to create a DBLoader instance");
@@ -124,41 +138,50 @@ async fn main() {
         .await
         .unwrap();
 
-    let mut resolver: Option<Resolver> = None;
-    if config.resolve_offchain_data {
-        resolver = Some(
-            Resolver::new(&config.postgres_dsn)
-                .await
-                .expect("Failed to connect DB state")
-                .with_link_resolver(
-                    "https".to_string(),
-                    Box::new(HTTPSLinkResolver::new().expect("failed to create HTTP client")),
-                )
-                .with_link_resolver(
-                    "ar".to_string(),
-                    Box::new(ArweaveLinkResolver::new().expect("failed to create HTTP client")),
-                )
-                .with_parser(
-                    config.schema.clone(),
-                    client
-                        .get_binary(&config.module_name)
-                        .expect("Failed to load manifest binary"),
-                )
-                .expect("Failed to create wasm vm"),
+    let (off_chain_task_sender, wasm_host, resolver_task) = if !config.resolve_offchain_data {
+        (None, None, None)
+    } else {
+        let mut modules: HashMap<String, &[u8]> = HashMap::new();
+        modules.insert(
+            config.schema.clone(),
+            client
+                .get_binary(&config.module_name)
+                .ok_or(anyhow!("Failed to get binary"))?,
         );
 
+        let wasm_host = wasm::Host::spawn_wasm(
+            modules,
+            PgPool::connect(&config.postgres_dsn).await.unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let mut link_resolvers: HashMap<String, Arc<dyn LinkResolver>> = HashMap::new();
+        link_resolvers.insert("https".to_string(), Arc::new(HTTPSLinkResolver::new()?));
+        link_resolvers.insert("ar".to_string(), Arc::new(ArweaveLinkResolver::new()?));
         if config.ipfs_clients.len() > 0 {
-            resolver = resolver.map(|resolver| {
-                resolver.with_link_resolver(
-                    "ipfs".to_string(),
-                    Box::new(
-                        IpfsLinkResolver::new(&config.ipfs_clients)
-                            .expect("failed to create IPFS client"),
-                    ),
-                )
-            });
+            link_resolvers.insert(
+                "ipfs".to_string(),
+                Arc::new(IpfsLinkResolver::new(&config.ipfs_clients)?),
+            );
         }
-    }
+
+        let (mut resolver, off_chain_task_sender) =
+            Resolver::new(&config.postgres_dsn, link_resolvers, config.max_concurrent_resolver_tasks).await?;
+
+        let parsers = wasm_host.get_channels().clone();
+        let runtime = tokio::runtime::Handle::current();
+        let resolver_task = tokio::spawn(async move {
+            let _runtime_guard = runtime.enter();
+            resolver.run(parsers).await
+        });
+
+        (
+            Some(off_chain_task_sender),
+            Some(wasm_host),
+            Some(resolver_task),
+        )
+    };
 
     let cursor = db_loader
         .get_cursor(config.module_name.clone())
@@ -239,10 +262,15 @@ async fn main() {
                                                 .to_owned()
                                                 .unwrap()
                                             {
-                                                if let Some(ref mut r) = resolver {
-                                                    r.add_task(&config.schema, request)
-                                                        .await
-                                                        .expect("Failed to add task.");
+                                                if let Some(ref off_chain_task_sender) =
+                                                    off_chain_task_sender
+                                                {
+                                                    off_chain_task_sender
+                                                        .send(resolver::Message::Job(ResolveTask {
+                                                            manifest: config.schema.clone(),
+                                                            request,
+                                                            num_retries: 0,
+                                                        })).await?;
                                                 }
                                             }
                                         }
@@ -273,10 +301,17 @@ async fn main() {
             _ => {}
         }
     }
-    resolver.map(|mut resolver| async move {
-        info!("Resolving offchain content...");
-        resolver.run(true).await.expect("failed to run resolver");
-    });
+
+    if let (Some(off_chain_task_sender), Some(resolver_task), Some(wasm_host)) =
+        (off_chain_task_sender, resolver_task, wasm_host)
+    {
+        info!("Waiting for offchain content...");
+        off_chain_task_sender.send(resolver::Message::Termination).await?;
+        let _ = resolver_task.await?;
+        debug!("Waiting for WASM host...");
+        wasm_host.wait().await?;
+    }
+    Ok(())
 }
 
 fn decode<T: std::default::Default + prost::Message>(
