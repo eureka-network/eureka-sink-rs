@@ -138,7 +138,7 @@ async fn run(config: Config) -> Result<()> {
         .await
         .unwrap();
 
-    let (off_chain_task_sender, wasm_host, resolver_task) = if !config.resolve_offchain_data {
+    let (offchain_task_sender, wasm_host, resolver_task) = if !config.resolve_offchain_data {
         (None, None, None)
     } else {
         let mut modules: HashMap<String, &[u8]> = HashMap::new();
@@ -166,9 +166,9 @@ async fn run(config: Config) -> Result<()> {
             );
         }
 
-        let (mut resolver, off_chain_task_sender) =
+        let mut resolver =
             Resolver::new(&config.postgres_dsn, link_resolvers, config.max_concurrent_resolver_tasks).await?;
-
+        let offchain_task_sender = resolver.get_sender();
         let parsers = wasm_host.get_channels().clone();
         let runtime = tokio::runtime::Handle::current();
         let resolver_task = tokio::spawn(async move {
@@ -177,7 +177,7 @@ async fn run(config: Config) -> Result<()> {
         });
 
         (
-            Some(off_chain_task_sender),
+            Some(offchain_task_sender),
             Some(wasm_host),
             Some(resolver_task),
         )
@@ -262,10 +262,10 @@ async fn run(config: Config) -> Result<()> {
                                                 .to_owned()
                                                 .unwrap()
                                             {
-                                                if let Some(ref off_chain_task_sender) =
-                                                    off_chain_task_sender
+                                                if let Some(ref offchain_task_sender) =
+                                                    offchain_task_sender
                                                 {
-                                                    off_chain_task_sender
+                                                    offchain_task_sender
                                                         .send(resolver::Message::Job(ResolveTask {
                                                             manifest: config.schema.clone(),
                                                             request,
@@ -302,11 +302,11 @@ async fn run(config: Config) -> Result<()> {
         }
     }
 
-    if let (Some(off_chain_task_sender), Some(resolver_task), Some(wasm_host)) =
-        (off_chain_task_sender, resolver_task, wasm_host)
+    if let (Some(offchain_task_sender), Some(resolver_task), Some(wasm_host)) =
+        (offchain_task_sender, resolver_task, wasm_host)
     {
         info!("Waiting for offchain content...");
-        off_chain_task_sender.send(resolver::Message::Termination).await?;
+        offchain_task_sender.send(resolver::Message::Termination).await?;
         let _ = resolver_task.await?;
         debug!("Waiting for WASM host...");
         wasm_host.wait().await?;

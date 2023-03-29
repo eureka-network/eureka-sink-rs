@@ -96,30 +96,33 @@ impl Resolver {
     ///    * `max_concurrent_resolver_tasks` - Maximum number of concurrent resolver tasks
     /// # Returns
     ///   * `Resolver` - Resolver instance
-    ///   * `Sender<Message>` - Sender to the resolver
     pub async fn new(
         pg_database_url: &str,
         downloaders: HashMap<String, Arc<dyn LinkResolver>>,
         max_concurrent_resolver_tasks: u64,
-    ) -> Result<(Self, Sender<Message>)> {
+    ) -> Result<Self> {
         let (off_chain_task_sender, off_chain_task_receiver) =
             async_channel::unbounded::<Message>();
 
         let connection_pool = PgPool::connect(pg_database_url).await?;
         let mut state = DBResolverState::new(connection_pool.clone()).await?;
-        Ok((
-            Self {
-                off_chain_task_receiver,
-                off_chain_task_sender: off_chain_task_sender.clone(),
-                queue: state.load_tasks().await?,
-                state,
-                downloaders,
-                is_stopped: false,
-                num_running_tasks: Arc::new(AtomicU64::new(0)),
-                max_concurrent_resolver_tasks,
-            },
-            off_chain_task_sender,
-        ))
+        Ok(Self {
+            off_chain_task_receiver,
+            off_chain_task_sender: off_chain_task_sender.clone(),
+            queue: state.load_tasks().await?,
+            state,
+            downloaders,
+            is_stopped: false,
+            num_running_tasks: Arc::new(AtomicU64::new(0)),
+            max_concurrent_resolver_tasks,
+        })
+    }
+
+    /// Get the sender to the resolver
+    /// # Returns
+    ///  * `Sender<Message>` - Sender to the resolver
+    pub fn get_sender(&self) -> Sender<Message> {
+        self.off_chain_task_sender.clone()
     }
 
     /// Run the resolver
