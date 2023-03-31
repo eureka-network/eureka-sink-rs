@@ -1,4 +1,5 @@
 mod block_commit;
+mod event_filtering;
 mod p_adic_representations;
 
 pub mod pb {
@@ -15,6 +16,7 @@ use substreams_ethereum::pb::eth::v2 as eth;
 use crate::block_commit::BlockCommitment;
 
 const DOMAIN_SEPARATION_LABEL: &str = "tests.commitments.BLOCK_COMMITMENT";
+pub(crate) const D: usize = 2;
 
 pub type F = GoldilocksField;
 pub type Digest = [F; 4];
