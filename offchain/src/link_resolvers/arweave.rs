@@ -7,14 +7,15 @@ use tonic::transport::Uri;
 
 /// Arweave link resolver
 pub struct ArweaveLinkResolver {
-    http_client: reqwest::Client,
+    // TODO: reuse connections
+    _http_client: reqwest::Client,
 }
 
 impl ArweaveLinkResolver {
     /// Create a new Arweave link resolver
     pub fn new() -> Result<Self> {
         Ok(Self {
-            http_client: reqwest::Client::builder().use_rustls_tls().build()?,
+            _http_client: reqwest::Client::builder().use_rustls_tls().build()?,
         })
     }
 }
@@ -28,8 +29,10 @@ impl LinkResolver for ArweaveLinkResolver {
             .host()
             .ok_or(anyhow!("Failed to parse path in {}", uri))?;
         let url = format!("https://arweave.net/{}", id);
-        let content = self
-            .http_client
+        debug!("fetching {}", url);
+        let content = reqwest::Client::builder()
+            .use_rustls_tls()
+            .build()?
             .get(url)
             .timeout(Duration::from_secs(5))
             .send()

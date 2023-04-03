@@ -19,7 +19,8 @@ struct IpfsClient {
 
 /// IPFS link resolver
 pub struct IpfsLinkResolver {
-    http_client: reqwest::Client,
+    // TODO: reuse connections
+    _http_client: reqwest::Client,
     clients: Vec<IpfsClient>,
 }
 
@@ -27,7 +28,7 @@ impl IpfsLinkResolver {
     /// Create a new IPFS link resolver
     pub fn new(clients: &Vec<String>) -> Result<Self> {
         Ok(Self {
-            http_client: reqwest::Client::builder().use_rustls_tls().build()?,
+            _http_client: reqwest::Client::builder().use_rustls_tls().build()?,
             clients: clients
                 .iter()
                 .map(|address| IpfsClient {
@@ -57,8 +58,9 @@ impl LinkResolver for IpfsLinkResolver {
                 .ok_or(anyhow!("Failed to parse path in {}", uri))?;
             let url = format!("{}/api/v0/cat?arg={}", &client.address, cid);
             debug!("fetching {}", url);
-            let content = self
-                .http_client
+            let content = reqwest::Client::builder()
+                .use_rustls_tls()
+                .build()?
                 .post(&url)
                 .timeout(Duration::from_secs(5))
                 .send()

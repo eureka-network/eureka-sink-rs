@@ -6,14 +6,15 @@ use async_trait::async_trait;
 
 /// HTTPS link resolver
 pub struct HTTPSLinkResolver {
-    http_client: reqwest::Client,
+    // TODO: reuse connections
+    _http_client: reqwest::Client,
 }
 
 impl HTTPSLinkResolver {
     /// Create a new HTTPS link resolver
     pub fn new() -> Result<Self> {
         Ok(Self {
-            http_client: reqwest::Client::builder().use_rustls_tls().build()?,
+            _http_client: reqwest::Client::builder().use_rustls_tls().build()?,
         })
     }
 }
@@ -22,8 +23,7 @@ impl HTTPSLinkResolver {
 impl LinkResolver for HTTPSLinkResolver {
     /// Download content from the given URI
     async fn download(&self, uri: &str) -> Result<Vec<u8>> {
-        let content = self
-            .http_client
+        let content = reqwest::Client::builder().use_rustls_tls().build()?
             .get(uri)
             .timeout(Duration::from_secs(5))
             .send()

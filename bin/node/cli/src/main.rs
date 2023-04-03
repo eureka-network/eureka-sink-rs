@@ -15,9 +15,10 @@ use eureka_sink_postgres::{
 };
 use hex::encode;
 
+use anyhow::{anyhow, Result};
 use offchain::{
-    wasm, resolver, ArweaveLinkResolver, HTTPSLinkResolver, IpfsLinkResolver, LinkResolver, ResolveTask,
-    Resolver,
+    resolver, wasm, ArweaveLinkResolver, HTTPSLinkResolver, IpfsLinkResolver, LinkResolver,
+    ResolveTask, Resolver,
 };
 use sqlx::PgPool;
 use std::{collections::HashMap, fs::File, io::Read, str::FromStr, sync::Arc};
@@ -26,7 +27,6 @@ use substreams_sink::{
     pb::Value, substreams::pb::response::Message, BlockRef, Cursor, SubstreamsSink,
 };
 use tokio_stream::StreamExt;
-use anyhow::{anyhow, Result};
 
 const DOMAIN_SEPARATION_LABEL: &str = "bin.node.cli.PRIMARY_KEY_INSERT_INTO";
 
@@ -75,8 +75,8 @@ struct Config {
     #[clap(short, long, default_value = "false")]
     resolve_offchain_data: bool,
     /// Maximum number of cuncurrent resolver tasks
-    #[clap(long, default_value = "48")]
-    max_concurrent_resolver_tasks: u64,
+    #[clap(long, default_value = "10")]
+    max_concurrent_resolver_tasks: usize,
 }
 
 #[tokio::main]
@@ -153,8 +153,7 @@ async fn run(config: Config) -> Result<()> {
             modules,
             PgPool::connect(&config.postgres_dsn).await.unwrap(),
         )
-        .await
-        .unwrap();
+        .await?;
 
         let mut link_resolvers: HashMap<String, Arc<dyn LinkResolver>> = HashMap::new();
         link_resolvers.insert("https".to_string(), Arc::new(HTTPSLinkResolver::new()?));
@@ -166,14 +165,20 @@ async fn run(config: Config) -> Result<()> {
             );
         }
 
-        let mut resolver =
-            Resolver::new(&config.postgres_dsn, link_resolvers, config.max_concurrent_resolver_tasks).await?;
+        let mut resolver = Resolver::new(
+            &config.postgres_dsn,
+            link_resolvers,
+            config.max_concurrent_resolver_tasks,
+        )
+        .await?;
         let offchain_task_sender = resolver.get_sender();
         let parsers = wasm_host.get_channels().clone();
         let runtime = tokio::runtime::Handle::current();
         let resolver_task = tokio::spawn(async move {
             let _runtime_guard = runtime.enter();
-            resolver.run(parsers).await
+            if let Err(e) = resolver.run(parsers).await {
+                error!("Error in resolver thread: {}", e);
+            }
         });
 
         (
@@ -201,29 +206,31 @@ async fn run(config: Config) -> Result<()> {
             &cursor.cursor,
             "STEP_IRREVERSIBLE",
         )
-        .await
-        .unwrap()
+        .await?
         .into_inner();
 
     while let Some(resp) = stream.next().await {
         match resp.unwrap().message.unwrap() {
             Message::Data(block_scoped_data) => {
-                let clock = block_scoped_data.clock.unwrap();
+                let clock = block_scoped_data
+                    .clock
+                    .ok_or(anyhow!("Failed to parse clock"))?;
                 let cursor = Cursor::new(
                     block_scoped_data.cursor,
                     BlockRef::new(clock.id, clock.number),
                 );
                 for output in block_scoped_data.outputs {
-                    match output.data.unwrap() {
+                    match output.data.ok_or(anyhow!("Failed to parse block data"))? {
                         substreams_sink::substreams::pb::module_output::Data::MapOutput(d) => {
-                            let ops: substreams_sink::pb::RecordChanges = decode(&d.value).unwrap();
+                            let ops: substreams_sink::pb::RecordChanges = decode(&d.value)?;
                             for op in &ops.record_changes {
                                 let table_name = op.record.clone();
                                 let id = op.id.clone();
                                 let ordinal = op.ordinal;
                                 // get primary key column name
-                                let primary_key_column_name =
-                                    db_loader.get_primary_key_column_name(&table_name).unwrap();
+                                let primary_key_column_name = db_loader
+                                    .get_primary_key_column_name(&table_name)
+                                    .ok_or(anyhow!("Failed to get primary key"))?;
                                 // TODO: is block_height missing?
                                 // clock.number
                                 let primary_key_label =
@@ -246,7 +253,10 @@ async fn run(config: Config) -> Result<()> {
                                                 field.old_value.is_none(),
                                                 "insert operation is append only"
                                             );
-                                            let new_value = field.new_value.as_ref().unwrap();
+                                            let new_value = field
+                                                .new_value
+                                                .as_ref()
+                                                .ok_or(anyhow!("Failed to get field"))?;
                                             let new_value = match parse_type_of(new_value) {
                                                 ColumnArrayOrValue::Value(v) => v,
                                                 ColumnArrayOrValue::Array(_) => {
@@ -257,10 +267,10 @@ async fn run(config: Config) -> Result<()> {
                                             if let pb::value::Typed::Offchaindata(request) = field
                                                 .new_value
                                                 .as_ref()
-                                                .unwrap()
+                                                .ok_or(anyhow!("Failed to get typed value"))?
                                                 .typed
                                                 .to_owned()
-                                                .unwrap()
+                                                .ok_or(anyhow!("Failed to access typed value"))?
                                             {
                                                 if let Some(ref offchain_task_sender) =
                                                     offchain_task_sender
@@ -270,7 +280,8 @@ async fn run(config: Config) -> Result<()> {
                                                             manifest: config.schema.clone(),
                                                             request,
                                                             num_retries: 0,
-                                                        })).await?;
+                                                        }))
+                                                        .await?;
                                                 }
                                             }
                                         }
@@ -301,12 +312,15 @@ async fn run(config: Config) -> Result<()> {
             _ => {}
         }
     }
+    info!("Done reading stream");
 
     if let (Some(offchain_task_sender), Some(resolver_task), Some(wasm_host)) =
         (offchain_task_sender, resolver_task, wasm_host)
     {
         info!("Waiting for offchain content...");
-        offchain_task_sender.send(resolver::Message::Termination).await?;
+        offchain_task_sender
+            .send(resolver::Message::Termination)
+            .await?;
         let _ = resolver_task.await?;
         debug!("Waiting for WASM host...");
         wasm_host.wait().await?;

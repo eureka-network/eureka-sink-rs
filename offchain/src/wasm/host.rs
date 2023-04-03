@@ -1,17 +1,19 @@
 use crate::ContentParser;
 use crate::ResolveTask;
 use anyhow::Result;
-use async_channel::{unbounded, Sender};
+use tokio::sync::mpsc::{channel as bounded, Sender};
 use sqlx::PgPool;
 use std::collections::HashMap;
 
 /// Message to the WASM module executor.
+#[derive(Debug)]
 pub enum Message {
     Job(WasmJob),
     Termination,
 }
 
 /// WASM parsing job
+#[derive(Debug)]
 pub struct WasmJob {
     task: ResolveTask,
     content: Vec<u8>,
@@ -50,7 +52,7 @@ impl Host {
         let mut wasm_modules: HashMap<String, Module> = HashMap::new();
         let connection_pool_clone = connection_pool.clone();
         for m in modules.iter() {
-            let (sender, receiver) = unbounded::<Message>();
+            let (sender, mut receiver) = bounded::<Message>(1000);
             let mut parser = crate::Parser::new(m.1, connection_pool_clone.clone()).unwrap();
             wasm_modules.insert(
                 m.0.clone(),
@@ -60,20 +62,21 @@ impl Host {
                         debug!("started parsing thread");
                         loop {
                             match receiver.recv().await {
-                                Ok(message) => match message {
+                                Some(message) => match message {
                                     Message::Job(job) => {
                                         debug!("Parsing {}", job.task.request.uri);
-                                        if let Err(e) = parser.parse(&job.task, job.content) {
+                                        if let Err(e) = parser.parse(&job.task, job.content).await {
                                             error!("Error parsing {}: {}", job.task.request.uri, e);
                                         }
+                                        debug!("Done parsing {}", job.task.request.uri);
                                     }
                                     Message::Termination => {
                                         debug!("received end of stream");
                                         break;
                                     }
                                 },
-                                Err(e) => {
-                                    panic!("Failed to receive parsing job: {}", e);
+                                None => {
+                                    error!("wasm::host: Failed to receive parsing job.");
                                 }
                             }
                         }
