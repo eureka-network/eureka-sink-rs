@@ -2,8 +2,14 @@ use crate::{block_commit::EncodedLog, D, F};
 use anyhow::anyhow;
 use plonky2::{
     field::types::Field,
-    hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
-    iop::target::Target,
+    hash::{
+        hash_types::{HashOut, HashOutTarget},
+        poseidon::PoseidonHash,
+    },
+    iop::{
+        target::Target,
+        witness::{PartialWitness, WitnessWrite},
+    },
     plonk::circuit_builder::CircuitBuilder,
 };
 
@@ -11,27 +17,27 @@ const GOLDILOCK_ADDRESS_ENCODED_LEN: usize = 5;
 const START_INDEX_GOLDILOCK_ADDRESS_ENCODED_IN_EVENT: usize = 2;
 
 pub struct EventTargets {
-    all_events_merkle_tree_root: Vec<Target>,
+    event_root_commitment_hash_targets: HashOutTarget,
     pi_address_targets: Vec<Target>,
-    event_targets: Vec<Vec<Target>>,
-    selected_event_targets: Vec<Vec<Target>>,
-    unselected_event_targets: Vec<Vec<Target>>,
+    events_targets: Vec<Vec<Target>>,
+    selected_events_targets: Vec<Vec<Target>>,
+    unselected_events_targets: Vec<Vec<Target>>,
 }
 
 impl EventTargets {
     pub fn new(
-        all_events_merkle_tree_root: Vec<Target>,
+        event_root_commitment_hash_targets: HashOutTarget,
         pi_address_targets: Vec<Target>,
-        event_targets: Vec<Vec<Target>>,
-        selected_event_targets: Vec<Vec<Target>>,
-        unselected_event_targets: Vec<Vec<Target>>,
+        events_targets: Vec<Vec<Target>>,
+        selected_events_targets: Vec<Vec<Target>>,
+        unselected_events_targets: Vec<Vec<Target>>,
     ) -> Self {
         Self {
-            all_events_merkle_tree_root,
+            event_root_commitment_hash_targets,
             pi_address_targets,
-            event_targets,
-            selected_event_targets,
-            unselected_event_targets,
+            events_targets,
+            selected_events_targets,
+            unselected_events_targets,
         }
     }
 }
@@ -43,7 +49,15 @@ pub fn select_events_by_address(
     pi_select_address: Vec<F>,
 ) -> Result<EventTargets, anyhow::Error> {
     if events.len() == 0 {
-        return Ok(EventTargets::new(vec![], vec![], vec![], vec![], vec![]));
+        return Ok(EventTargets::new(
+            HashOutTarget {
+                elements: [builder.constant(F::ZERO); 4],
+            },
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        ));
     }
     // check that `pi_select_address` length is correct
     if pi_select_address.len() != GOLDILOCK_ADDRESS_ENCODED_LEN {
@@ -52,12 +66,12 @@ pub fn select_events_by_address(
     // add targets for
     // 1. Event commitment merkle tree root targets
     // 2. Address encoding for filtering events
-    let event_root_commitment_targets = builder.add_virtual_hash();
-    let select_address_targets = builder.add_virtual_targets(GOLDILOCK_ADDRESS_ENCODED_LEN);
+    let event_root_commitment_hash_targets = builder.add_virtual_hash();
+    let pi_address_targets = builder.add_virtual_targets(GOLDILOCK_ADDRESS_ENCODED_LEN);
 
     // register these as the only public inputs
-    builder.register_public_inputs(&event_root_commitment_targets.elements);
-    builder.register_public_inputs(&select_address_targets);
+    builder.register_public_inputs(&event_root_commitment_hash_targets.elements);
+    builder.register_public_inputs(&pi_address_targets);
 
     // for each event, add corresponding targets to the circuit
     let mut all_event_targets = vec![];
@@ -86,12 +100,12 @@ pub fn select_events_by_address(
         all_event_address_targets.push(event_address_targets);
     }
 
-    // filter event targets whose address targets match with `select_address_targets`
+    // filter event targets whose address targets match with `pi_address_targets`
     // while also registering those that don't match
     let mut selected_events_targets: Vec<Vec<Target>> = vec![];
     let mut unselected_events_targets: Vec<Vec<Target>> = vec![];
 
-    for ((ind, event), event_targets) in events.iter().enumerate().zip(all_event_targets) {
+    for ((ind, event), event_targets) in events.iter().enumerate().zip(all_event_targets.iter()) {
         if event[START_INDEX_GOLDILOCK_ADDRESS_ENCODED_IN_EVENT
             ..GOLDILOCK_ADDRESS_ENCODED_LEN + START_INDEX_GOLDILOCK_ADDRESS_ENCODED_IN_EVENT]
             == pi_select_address[..]
@@ -104,11 +118,11 @@ pub fn select_events_by_address(
                 builder.connect(selected_event_targets[i + 1], event_targets[i + 1]);
             }
             // finally connect the select event targets, corresponding to the address
-            // range, to `select_address_targets`
+            // range, to `pi_address_targets`
             for i in 0..GOLDILOCK_ADDRESS_ENCODED_LEN {
                 builder.connect(
                     selected_event_targets[START_INDEX_GOLDILOCK_ADDRESS_ENCODED_IN_EVENT + i + 1],
-                    select_address_targets[i],
+                    pi_address_targets[i],
                 )
             }
             selected_events_targets.push(selected_event_targets);
@@ -122,12 +136,12 @@ pub fn select_events_by_address(
             }
             // finally make sure that targets withing address range do not match the
             // event address targets (that we are selecting from)
-            // address is defined by 5 field elements, and combined they should not match `select_address_targets`
+            // address is defined by 5 field elements, and combined they should not match `pi_address_targets`
             let mut bool_cummulative_target =
-                builder.is_equal(select_address_targets[1], unselected_event_targets[1]);
+                builder.is_equal(pi_address_targets[1], unselected_event_targets[1]);
             for i in 1..5 {
                 let bool_target = builder.is_equal(
-                    select_address_targets[i],
+                    pi_address_targets[i],
                     unselected_event_targets
                         [START_INDEX_GOLDILOCK_ADDRESS_ENCODED_IN_EVENT + i + 1],
                 );
@@ -142,7 +156,27 @@ pub fn select_events_by_address(
         }
     }
 
-    Ok(EventTargets::new(vec![], vec![], vec![], vec![], vec![]))
+    let computed_merkle_root_target = build_merkle_root_target(
+        builder,
+        all_event_targets.clone(),
+        all_constant_targets[0].clone(),
+    ); // extend with zero target
+
+    // connected `computed_merkle_root_target`
+    for i in 0..4 {
+        builder.connect(
+            computed_merkle_root_target.elements[i],
+            event_root_commitment_hash_targets.elements[i],
+        );
+    }
+
+    Ok(EventTargets::new(
+        event_root_commitment_hash_targets,
+        pi_address_targets,
+        all_event_targets,
+        selected_events_targets,
+        unselected_events_targets,
+    ))
 }
 
 pub fn build_merkle_root_target(
@@ -201,13 +235,71 @@ pub fn extend_targets_to_power_of_two(
     targets
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub fn fill_circuit_witnesses(
+    partial_witness: &mut PartialWitness<F>,
+    targets: EventTargets,
+    event_root_commitment_hash: HashOut<F>,
+    address: [F; 5],
+    events: Vec<Vec<F>>,
+    selected_events: Vec<Vec<F>>,
+) -> Result<(), anyhow::Error> {
+    let EventTargets {
+        event_root_commitment_hash_targets,
+        events_targets,
+        pi_address_targets,
+        selected_events_targets,
+        unselected_events_targets,
+    } = targets;
 
-    #[test]
-    fn aux() {
-        let x = 1 << 0;
-        assert_eq!(1, 0);
+    if events.len() != events_targets.len() {
+        return Err(anyhow!("Events do not have the correct length"));
     }
+
+    if selected_events.len() != selected_events_targets.len() {
+        return Err(anyhow!("Selected events do not have the correct length"));
+    }
+
+    // fill in hashes
+    for i in 0..4 {
+        partial_witness.set_target(
+            event_root_commitment_hash_targets.elements[i],
+            event_root_commitment_hash.elements[i],
+        );
+    }
+
+    // fill in address to filter
+    for i in 0..GOLDILOCK_ADDRESS_ENCODED_LEN {
+        partial_witness.set_target(pi_address_targets[i], address[i])
+    }
+
+    // fill in events
+    for ind in 0..events.len() {
+        let event = events[ind].clone();
+        for i in 0..event.len() {
+            // first entry is for the index, which we do not have to fill in
+            partial_witness.set_target(events_targets[ind][i + 1], event[i]);
+        }
+    }
+
+    // fill in both selected and unselected events
+    let mut selected_ind = 0;
+    let mut unselected_ind = 0;
+    for ind in 0..events.len() {
+        let event = events[ind].clone();
+        if selected_events.contains(&event) {
+            for i in 0..event.len() {
+                // first entry is for the index, which we do not have to fill in
+                partial_witness.set_target(selected_events_targets[selected_ind][i + 1], event[i]);
+            }
+            selected_ind += 1;
+        } else {
+            for i in 0..event.len() {
+                // first entry is for the index, which we do not have to fill in
+                partial_witness
+                    .set_target(unselected_events_targets[unselected_ind][i + 1], event[i]);
+            }
+            unselected_ind += 1;
+        }
+    }
+    Ok(())
 }
