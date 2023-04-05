@@ -125,7 +125,7 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                     typed: Some(pb::value::Typed::String(
                         // our MerkleTree has cap == 0, therefore,
                         // the only elements in its cap corresponde to vec![root]
-                        Hex(&block_commitment.events_commitment_root()).to_string(),
+                        Hex(&block_commitment.events_commitment_root_to_bytes()).to_string(),
                     )),
                 }),
                 old_value: None,
