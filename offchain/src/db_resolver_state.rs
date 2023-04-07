@@ -1,20 +1,26 @@
-use std::time::Duration;
-
 use crate::resolver::{ResolveTask, ResolverState, TaskState};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::TryStreamExt;
-use sqlx::PgPool;
-use tokio_util::time::delay_queue::DelayQueue;
 use int_enum::IntEnum;
-use substreams_sink::{OffchainData};
+use sqlx::PgPool;
+use std::time::Duration;
+use substreams_sink::OffchainData;
+use tokio_util::time::delay_queue::DelayQueue;
 
 /// Saves resolver state in Posgtres DB.
+#[derive(Clone)]
 pub struct DBResolverState {
     connection_pool: PgPool,
 }
 
 impl DBResolverState {
+    /// Creates a new DBResolverState.
+    /// Creates the resolver_tasks table if it does not exist.
+    /// # Arguments
+    ///  * `connection_pool` - A connection pool to the database.
+    /// # Returns
+    /// * `DBResolverState` - The DBResolverState.
     pub async fn new(connection_pool: PgPool) -> Result<Self> {
         sqlx::query!(
             r#"CREATE TABLE IF NOT EXISTS resolver_tasks
@@ -29,7 +35,7 @@ impl DBResolverState {
                 PRIMARY KEY (uri, manifest)
             )"#
         )
-        .execute(&mut connection_pool.acquire().await?)
+        .execute(&connection_pool)
         .await?;
         Ok(Self { connection_pool })
     }
@@ -37,10 +43,12 @@ impl DBResolverState {
 
 #[async_trait]
 impl ResolverState for DBResolverState {
+    /// Loads all queued tasks from the DB.
+    /// Returns a DelayQueue with all tasks.
+    /// The DelayQueue is used to schedule retries.
     async fn load_tasks(&mut self) -> Result<DelayQueue<ResolveTask>> {
-        let mut connection = self.connection_pool.acquire().await?;
         let mut rows = sqlx::query!("SELECT uri, manifest, handler, max_retries, wait_before_retry, num_retries, state FROM resolver_tasks WHERE state = $1", TaskState::Queued.int_value())
-        .fetch(&mut connection);
+        .fetch(&self.connection_pool);
 
         let mut task_queue = DelayQueue::new();
         while let Some(row) = rows.as_mut().try_next().await? {
@@ -61,8 +69,13 @@ impl ResolverState for DBResolverState {
         Ok(task_queue)
     }
 
-    async fn add_task(&mut self, task: &ResolveTask) -> Result<()> {
-        sqlx::query!(
+    /// Adds a new task to the DB.
+    /// # Arguments
+    /// * `task` - Task to add
+    /// # Returns
+    /// * `bool` - True if the task was added, false if it already exists.
+    async fn add_task(&mut self, task: &ResolveTask) -> Result<bool> {
+        match sqlx::query!(
             "INSERT INTO resolver_tasks (uri, manifest, handler, max_retries, wait_before_retry, num_retries, state) VALUES ($1, $2, $3, $4, $5, $6, $7)",
             task.request.uri,
             &task.manifest,
@@ -72,11 +85,23 @@ impl ResolverState for DBResolverState {
             task.num_retries,
             TaskState::Queued.int_value(),
         )
-        .execute(&mut self.connection_pool.acquire().await?)
-        .await?;
-        Ok(())
+        .execute(&self.connection_pool)
+        .await {
+            Ok(_) => Ok(true),
+            Err(err) => {
+                // TODO: check for specific error
+                if err.to_string().contains("duplicate key value violates unique constraint") {
+                    Ok(false)
+                } else {
+                    Err(err.into())
+                }
+            }
+        }
     }
 
+    /// Updates the retry counter of a task in the DB.
+    /// # Arguments
+    /// * `task` - Task to update
     async fn update_retry_counter(&mut self, task: &ResolveTask) -> Result<()> {
         sqlx::query!(
             "UPDATE resolver_tasks SET num_retries = $1 WHERE uri = $2 AND manifest = $3",
@@ -84,11 +109,15 @@ impl ResolverState for DBResolverState {
             &task.request.uri,
             &task.manifest,
         )
-        .execute(&mut self.connection_pool.acquire().await?)
+        .execute(&self.connection_pool)
         .await?;
         Ok(())
     }
 
+    /// Updates the state of a task in the DB.
+    /// # Arguments
+    /// * `task` - Task to update
+    /// * `state` - New state
     async fn update_task_state(&mut self, task: &ResolveTask, state: TaskState) -> Result<()> {
         sqlx::query!(
             "UPDATE resolver_tasks SET state = $1 WHERE uri = $2 AND manifest = $3",
@@ -96,7 +125,7 @@ impl ResolverState for DBResolverState {
             &task.request.uri,
             &task.manifest,
         )
-        .execute(&mut self.connection_pool.acquire().await?)
+        .execute(&self.connection_pool)
         .await?;
         Ok(())
     }

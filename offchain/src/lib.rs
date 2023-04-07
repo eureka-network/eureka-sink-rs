@@ -3,8 +3,10 @@ extern crate log;
 
 mod db_resolver_state;
 mod link_resolvers;
-mod resolver;
-mod wasm_parser;
-pub use link_resolvers::{https::HTTPSLinkResolver, ipfs::IpfsLinkResolver, arweave::ArweaveLinkResolver};
-pub use resolver::{ContentParser, LinkResolver, Resolver, TaskState};
-pub use wasm_parser::WasmParser;
+pub mod resolver;
+pub mod wasm;
+pub use link_resolvers::{
+    arweave::ArweaveLinkResolver, https::HTTPSLinkResolver, ipfs::IpfsLinkResolver,
+};
+pub use resolver::{ContentParser, LinkResolver, Message, ResolveTask, Resolver, TaskState};
+pub use wasm::Parser;

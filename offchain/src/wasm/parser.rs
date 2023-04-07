@@ -1,29 +1,39 @@
-use anyhow::{anyhow, Result};
-use futures::executor::block_on;
-use wasmer::{
-    imports, Cranelift, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store,
-};
-
 use crate::{resolver::ResolveTask, ContentParser};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use futures::executor::block_on;
 use int_enum::IntEnum;
 use prost::Message;
 use sqlx::{PgPool, Postgres, QueryBuilder};
 use substreams_sink::{pb, OffchainDataContent, OffchainDataRecord, OffchainDataRecords};
+use wasmer::{
+    imports, Cranelift, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store,
+};
 
+// TODO: revisit this
+const MAX_CONTENT_SIZE: usize = 1024 * 1024 * 1; // 1MB
+
+/// Wasm environment
 struct MyEnv {
     memory: Option<Memory>,
     connection_pool: PgPool,
 }
 
 /// Wasm parser
-pub struct WasmParser {
+pub struct Parser {
     store: Store,
     env: FunctionEnv<MyEnv>,
     _module: Module,
     instance: Instance,
 }
 
-impl WasmParser {
+impl Parser {
+    /// Create a new Parser
+    /// # Arguments
+    ///  * `code` - The WASM bytecode.
+    ///  * `connection_pool` - A connection pool to the database.
+    /// # Returns
+    /// * `Parser` - The WASM parser.
     pub fn new(code: &[u8], connection_pool: PgPool) -> Result<Self> {
         let mut store = Store::new(Cranelift::default());
         let env = FunctionEnv::new(
@@ -33,7 +43,7 @@ impl WasmParser {
                 connection_pool: connection_pool.clone(),
             },
         );
-        let module = Module::new(&store, code).unwrap();
+        let module = Module::new(&store, code)?;
 
         fn logger(_env: FunctionEnvMut<MyEnv>, _ptr: i32, _len: i32) {
             debug!("Calling logger");
@@ -41,46 +51,70 @@ impl WasmParser {
 
         fn output(env: FunctionEnvMut<MyEnv>, ptr: i32, len: i32) {
             let mut buf = vec![0; len as usize];
-            let memory = env.data().memory.as_ref().unwrap().clone();
-            memory.view(&env).read(ptr as u64, &mut buf).unwrap();
-            let records: OffchainDataRecords = Message::decode(buf.as_slice()).unwrap();
+            let memory = match env.data().memory.as_ref() {
+                Some(memory) => memory.clone(),
+                None => {
+                    error!("Memory not initialized");
+                    return;
+                }
+            };
+            if memory.view(&env).read(ptr as u64, &mut buf).is_err() {
+                error!("Failed to read memory");
+                return;
+            }
+            let records: OffchainDataRecords = match Message::decode(buf.as_slice()) {
+                Ok(records) => records,
+                Err(e) => {
+                    error!("Failed to decode message: {}", e);
+                    return;
+                }
+            };
             debug!("Received result {} {} {:?}", ptr, len, records);
 
+            let connection_pool = env.data().connection_pool.clone();
             block_on(async move {
                 if records.records.len() == 0 {
-                    let _ = sqlx::query!(
+                    debug!("wasm returned no records");
+                    if let Err(e) = sqlx::query!(
                         "UPDATE resolver_tasks SET state = $1 WHERE uri = $2 AND manifest = $3",
                         crate::TaskState::ParsingFailed.int_value(),
                         records.uri,
                         records.manifest,
                     )
-                    .execute(&mut env.data().connection_pool.acquire().await.unwrap())
-                    .await;
+                    .execute(&connection_pool)
+                    .await
+                    {
+                        error!("Failed to update task: {}", e);
+                    }
                 } else {
+                    debug!("wasm returned {} records", records.records.len());
                     for record in &records.records {
+                        //debug!("building record");
                         match build_query(&records.manifest, record) {
                             Ok(mut query) => {
+                                //debug!("inserting content");
                                 let query = query.build();
-                                let _ = query
-                                    .execute(
-                                        &mut env.data().connection_pool.acquire().await.unwrap(),
-                                    )
-                                    .await;
+                                if let Err(e) = query.execute(&connection_pool).await {
+                                    error!("Failed to insert content: {}", e);
+                                }
                             }
-                            Err(_e) => {
-                                error!("Failed to insert content");
-                                let _ = sqlx::query!(
+                            Err(e) => {
+                                error!("Failed to build query: {}", e);
+                                if let Err(e) = sqlx::query!(
                                     "UPDATE resolver_tasks SET state = $1 WHERE uri = $2 AND manifest = $3",
                                     crate::TaskState::ParsingFailed.int_value(),
                                     records.uri,
                                     records.manifest,
                                 )
-                                .execute(&mut env.data().connection_pool.acquire().await.unwrap())
-                                .await;
+                                .execute(&connection_pool)
+                                .await {
+                                    error!("Failed to update task: {}", e);
+                                }
                             }
                         }
                     }
                 }
+                debug!("parsing done");
             })
         }
 
@@ -108,10 +142,9 @@ impl WasmParser {
             },
         };
 
-        let instance = Instance::new(&mut store, &module, &imports).unwrap();
-        let memory = instance.exports.get_memory("memory").unwrap();
+        let instance = Instance::new(&mut store, &module, &imports)?;
+        let memory = instance.exports.get_memory("memory")?;
         env.as_mut(&mut store).memory = Some(memory.clone());
-        //let memory_view = memory.view(&store);
 
         Ok(Self {
             store,
@@ -121,40 +154,62 @@ impl WasmParser {
         })
     }
 }
-impl ContentParser for WasmParser {
-    fn parse(&mut self, task: &ResolveTask, content: Vec<u8>) -> Result<()> {
+
+#[async_trait]
+impl ContentParser for Parser {
+    /// Parse the content
+    /// # Arguments
+    /// * `task` - The task to resolve.
+    /// * `content` - The content to parse.
+    async fn parse(&mut self, task: &ResolveTask, content: Vec<u8>) -> Result<()> {
         let content = OffchainDataContent {
             uri: task.request.uri.clone(),
             manifest: task.manifest.clone(),
-            content: String::from_utf8(content).expect("failed to decode content"),
+            content: String::from_utf8(content)?,
         };
         let msg = content.encode_to_vec();
+        debug!("message len: {}", msg.len());
+        if msg.len() > MAX_CONTENT_SIZE {
+            let connection_pool = self.env.as_ref(&self.store).connection_pool.clone();
+            if let Err(e) = sqlx::query!(
+                "UPDATE resolver_tasks SET state = $1 WHERE uri = $2 AND manifest = $3",
+                crate::TaskState::ContentTooBig.int_value(),
+                content.uri,
+                content.manifest,
+            )
+            .execute(&connection_pool)
+            .await
+            {
+                error!("Failed to update task: {}", e);
+            }
+            return Ok(());
+        }
 
         let memory = self
             .env
             .as_ref(&self.store)
             .memory
             .as_ref()
-            .unwrap()
+            .ok_or(anyhow!("Failed to get memory."))?
             .clone();
         let memory_view = memory.view(&self.store);
 
-        memory_view.write(0, msg.as_slice()).unwrap();
-        let map_content_uri = self
-            .instance
-            .exports
-            .get_function(&task.request.handler)
-            .unwrap();
-        map_content_uri
-            .call(
-                &mut self.store,
-                &[wasmer::Value::I32(0), wasmer::Value::I32(msg.len() as i32)],
-            )
-            .unwrap();
+        memory_view.write(0, msg.as_slice())?;
+        let map_content_uri = self.instance.exports.get_function(&task.request.handler)?;
+        map_content_uri.call(
+            &mut self.store,
+            &[wasmer::Value::I32(0), wasmer::Value::I32(msg.len() as i32)],
+        )?;
         Ok(())
     }
 }
 
+/// Build a query from the record
+/// # Arguments
+/// * `manifest` - The manifest name.
+/// * `record` - The record to build the query from.
+/// # Returns
+/// * `QueryBuilder` - The query builder.
 fn build_query<'args>(
     manifest: &str,
     record: &'args OffchainDataRecord,
@@ -166,7 +221,13 @@ fn build_query<'args>(
         QueryBuilder::<Postgres>::new(format!("INSERT INTO {}.{} (", manifest, record.record));
     let mut separated = query.separated(", ");
     for field in &record.fields {
-        let typed = field.new_value.as_ref().unwrap().typed.to_owned().unwrap();
+        let typed = field
+            .new_value
+            .as_ref()
+            .ok_or(anyhow!("Failed to get typed value"))?
+            .typed
+            .to_owned()
+            .ok_or(anyhow!("Failed to access typed value"))?;
         match typed {
             pb::value::Typed::Offchaindata(_) | pb::value::Typed::Array(_) => {
                 return Err(anyhow!("not supported"));
@@ -184,7 +245,13 @@ fn build_query<'args>(
     let mut bound = query.separated(", ");
     use substreams_sink::pb::value::Typed;
     for v in args {
-        let typed = v.new_value.as_ref().unwrap().typed.to_owned().unwrap();
+        let typed = v
+            .new_value
+            .as_ref()
+            .ok_or(anyhow!("Failed to get typed value"))?
+            .typed
+            .to_owned()
+            .ok_or(anyhow!("Failed to access typed value"))?;
         match typed {
             Typed::Int32(v) => {
                 bound.push_bind(v);
@@ -210,7 +277,7 @@ fn build_query<'args>(
             Typed::String(v) => {
                 bound.push_bind(v);
             }
-            _ => panic!("shouldn't get here"),
+            _ => unreachable!("filtered in the previous step"),
         };
     }
     bound.push_unseparated(")");
