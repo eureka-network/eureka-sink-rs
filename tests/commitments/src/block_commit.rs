@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use ethereum_types::U256;
 use plonky2::field::types::Field;
-use plonky2::hash::poseidon::PoseidonHash;
+use plonky2::hash::{hash_types::HashOut, poseidon::PoseidonHash};
 use plonky2::plonk::config::{GenericHashOut, Hasher};
 use substreams_ethereum::pb::eth::v2 as pb;
 
@@ -47,12 +47,18 @@ impl BlockCommitment {
         self.encoded_logs.clone()
     }
 
-    pub fn events_commitment_root(&self) -> Vec<u8> {
+    pub fn events_commitment_root_to_bytes(&self) -> Vec<u8> {
+        self.events_commitment_root().to_bytes()
+    }
+
+    pub fn events_commitment_root(&self) -> HashOut<F> {
         if let Some(ref events_commitment) = self.events_commitment {
             let poseidon_tree = events_commitment.get_inner();
-            return poseidon_tree.cap.0[0].to_bytes();
+            return poseidon_tree.cap.0[0];
         }
-        vec![]
+        HashOut {
+            elements: [F::ZERO; 4],
+        }
     }
 
     pub fn commit_events(&mut self) -> Result<(), anyhow::Error> {

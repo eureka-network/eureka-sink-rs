@@ -1,4 +1,5 @@
 mod block_commit;
+mod event_filtering;
 mod p_adic_representations;
 
 pub mod pb {
@@ -15,6 +16,7 @@ use substreams_ethereum::pb::eth::v2 as eth;
 use crate::block_commit::BlockCommitment;
 
 const DOMAIN_SEPARATION_LABEL: &str = "tests.commitments.BLOCK_COMMITMENT";
+pub(crate) const D: usize = 2;
 
 pub type F = GoldilocksField;
 pub type Digest = [F; 4];
@@ -123,7 +125,7 @@ fn extract_events(block: eth::Block) -> Result<RecordChanges, substreams::errors
                     typed: Some(pb::value::Typed::String(
                         // our MerkleTree has cap == 0, therefore,
                         // the only elements in its cap corresponde to vec![root]
-                        Hex(&block_commitment.events_commitment_root()).to_string(),
+                        Hex(&block_commitment.events_commitment_root_to_bytes()).to_string(),
                     )),
                 }),
                 old_value: None,
